@@ -1412,10 +1412,10 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn oneshot_multi_thread_recv_close_stress() {
         let stress_factor = stress_factor();
-        let mut ts = Vec::with_capacity(2 * stress_factor);
+        let mut ts = Vec::with_capacity(stress_factor);
+        let mut ts2 = Vec::with_capacity(stress_factor);
         for _ in 0..stress_factor {
             let (tx, rx) = sync_channel::<i32>(0);
             let t = thread::spawn(move || {
@@ -1429,12 +1429,15 @@ mod sync_channel_tests {
             let t2 = thread::spawn(move || {
                 thread::spawn(move || {
                     drop(tx);
-                });
+                })
             });
-            ts.push(t2);
+            ts2.push(t2);
         }
         for t in ts {
             t.join().unwrap();
+        }
+        for t2 in ts2 {
+            t2.join().unwrap().join().unwrap();
         }
     }
 
@@ -1456,44 +1459,47 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn stream_send_recv_stress() {
+        struct MaybeHandle (Option<Box<JoinHandle<MaybeHandle>>>);
+
         let stress_factor = stress_factor();
         let mut ts = Vec::with_capacity(2 * stress_factor);
         for _ in 0..stress_factor {
             let (tx, rx) = sync_channel::<Box<i32>>(0);
 
-            if let Some(t) = send(tx, 0) {
+            if let MaybeHandle(Some(t)) = send(tx, 0) {
                 ts.push(t);
             }
-            if let Some(t) = recv(rx, 0) {
+            if let MaybeHandle(Some(t)) = recv(rx, 0) {
                 ts.push(t);
             }
 
-            fn send(tx: SyncSender<Box<i32>>, i: i32) -> Option<JoinHandle<()>> {
+            fn send(tx: SyncSender<Box<i32>>, i: i32) -> MaybeHandle {
                 if i == 10 {
-                    return None;
+                    return MaybeHandle(None);
                 }
 
-                Some(thread::spawn(move || {
+                MaybeHandle(Some(Box::new(thread::spawn(move || {
                     tx.send(Box::new(i)).unwrap();
-                    send(tx, i + 1);
-                }))
+                    send(tx, i + 1)
+                }))))
             }
 
-            fn recv(rx: Receiver<Box<i32>>, i: i32) -> Option<JoinHandle<()>> {
+            fn recv(rx: Receiver<Box<i32>>, i: i32) -> MaybeHandle {
                 if i == 10 {
-                    return None;
+                    return MaybeHandle(None);
                 }
 
-                Some(thread::spawn(move || {
+                MaybeHandle(Some(Box::new(thread::spawn(move || {
                     assert!(*rx.recv().unwrap() == i);
-                    recv(rx, i + 1);
-                }))
+                    recv(rx, i + 1)
+                }))))
             }
         }
-        for t in ts {
-            t.join().unwrap();
+        for mut t in ts {
+            while let MaybeHandle(Some(handle)) = t.join().unwrap() {
+                t = handle;
+            }
         }
     }
 
@@ -1714,21 +1720,28 @@ mod sync_channel_tests {
     #[test]
     #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn issue_15761() {
-        fn repro() {
+        fn repro() -> JoinHandle<()> {
             let (tx1, rx1) = sync_channel::<()>(3);
             let (tx2, rx2) = sync_channel::<()>(3);
 
-            let _t = thread::spawn(move || {
+            let t = thread::spawn(move || {
                 rx1.recv().unwrap();
                 tx2.try_send(()).unwrap();
             });
 
             tx1.try_send(()).unwrap();
             rx2.recv().unwrap();
+
+            t
         }
 
+        let mut ts = Vec::with_capacity(100);
         for _ in 0..100 {
-            repro()
+            let t = repro();
+            ts.push(t);
+        }
+        for t in ts {
+            t.join().unwrap();
         }
     }
 }

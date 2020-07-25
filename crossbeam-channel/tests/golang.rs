@@ -13,7 +13,7 @@ use std::any::Any;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crossbeam_channel::{bounded, select, tick, Receiver, Select, Sender};
@@ -243,8 +243,9 @@ mod doubleselect {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
+        let mut ts = Vec::with_capacity(6);
+
         let c1 = make::<i32>(0);
         let c2 = make::<i32>(0);
         let c3 = make::<i32>(0);
@@ -252,19 +253,23 @@ mod doubleselect {
         let done = make::<bool>(0);
         let cmux = make::<i32>(0);
 
-        go!(c1, c2, c3, c4, sender(ITERATIONS, c1, c2, c3, c4));
-        go!(cmux, c1, done, mux(cmux, c1, done));
-        go!(cmux, c2, done, mux(cmux, c2, done));
-        go!(cmux, c3, done, mux(cmux, c3, done));
-        go!(cmux, c4, done, mux(cmux, c4, done));
-        go!(done, cmux, {
+        ts.push(go!(c1, c2, c3, c4, sender(ITERATIONS, c1, c2, c3, c4)));
+        ts.push(go!(cmux, c1, done, mux(cmux, c1, done)));
+        ts.push(go!(cmux, c2, done, mux(cmux, c2, done)));
+        ts.push(go!(cmux, c3, done, mux(cmux, c3, done)));
+        ts.push(go!(cmux, c4, done, mux(cmux, c4, done)));
+        ts.push(go!(done, cmux, {
             done.recv();
             done.recv();
             done.recv();
             done.recv();
             cmux.close();
-        });
+        }));
         recver(cmux);
+
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 }
 
@@ -296,15 +301,15 @@ mod fifo {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn synch_fifo() {
         let ch = make::<i32>(0);
         let mut inp = make::<i32>(0);
         let start = inp.clone();
+        let mut ts = Vec::with_capacity(N as usize);
 
         for i in 0..N {
             let out = make::<i32>(0);
-            go!(ch, i, inp, out, chain(ch, i, inp, out));
+            ts.push(go!(ch, i, inp, out, chain(ch, i, inp, out)));
             inp = out;
         }
 
@@ -313,6 +318,9 @@ mod fifo {
             ch.send(i);
         }
         inp.recv();
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 }
 
@@ -325,9 +333,9 @@ mod goroutines {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let n = 100i32;
+        let mut ts = Vec::with_capacity(n as usize + 1);
 
         let leftmost = make::<i32>(0);
         let mut right = leftmost.clone();
@@ -335,12 +343,16 @@ mod goroutines {
 
         for _ in 0..n {
             right = make::<i32>(0);
-            go!(left, right, f(left, right));
+            ts.push(go!(left, right, f(left, right)));
             left = right.clone();
         }
 
-        go!(right, right.send(1));
+        ts.push(go!(right, right.send(1)));
         leftmost.recv().unwrap();
+
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 }
 
@@ -399,8 +411,9 @@ mod nonblock {
     const MAX_TRIES: usize = 10000; // Up to 100ms per test.
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn main() {
+        let mut ts = Vec::with_capacity(16);
         let ticker = tick(Duration::new(0, 10_000)); // 10 us
         let sleep = || {
             ticker.recv().unwrap();
@@ -438,7 +451,7 @@ mod nonblock {
                 default => {}
             }
 
-            go!(c32, sync, i32receiver(c32, sync));
+            ts.push(go!(c32, sync, i32receiver(c32, sync)));
             let mut r#try = 0;
             loop {
                 select! {
@@ -454,7 +467,7 @@ mod nonblock {
                 }
             }
             sync.recv();
-            go!(c32, sync, i32sender(c32, sync));
+            ts.push(go!(c32, sync, i32sender(c32, sync)));
             if buffer > 0 {
                 sync.recv();
             }
@@ -481,7 +494,7 @@ mod nonblock {
                 sync.recv();
             }
 
-            go!(c64, sync, i64receiver(c64, sync));
+            ts.push(go!(c64, sync, i64receiver(c64, sync)));
             let mut r#try = 0;
             loop {
                 select! {
@@ -497,7 +510,7 @@ mod nonblock {
                 }
             }
             sync.recv();
-            go!(c64, sync, i64sender(c64, sync));
+            ts.push(go!(c64, sync, i64sender(c64, sync)));
             if buffer > 0 {
                 sync.recv();
             }
@@ -524,7 +537,7 @@ mod nonblock {
                 sync.recv();
             }
 
-            go!(cb, sync, breceiver(cb, sync));
+            ts.push(go!(cb, sync, breceiver(cb, sync)));
             let mut r#try = 0;
             loop {
                 select! {
@@ -540,7 +553,7 @@ mod nonblock {
                 }
             }
             sync.recv();
-            go!(cb, sync, bsender(cb, sync));
+            ts.push(go!(cb, sync, bsender(cb, sync)));
             if buffer > 0 {
                 sync.recv();
             }
@@ -567,7 +580,7 @@ mod nonblock {
                 sync.recv();
             }
 
-            go!(cs, sync, sreceiver(cs, sync));
+            ts.push(go!(cs, sync, sreceiver(cs, sync)));
             let mut r#try = 0;
             loop {
                 select! {
@@ -583,7 +596,7 @@ mod nonblock {
                 }
             }
             sync.recv();
-            go!(cs, sync, ssender(cs, sync));
+            ts.push(go!(cs, sync, ssender(cs, sync)));
             if buffer > 0 {
                 sync.recv();
             }
@@ -609,6 +622,10 @@ mod nonblock {
             if buffer == 0 {
                 sync.recv();
             }
+        }
+
+        for t in ts {
+            t.join().unwrap();
         }
     }
 }
@@ -698,25 +715,28 @@ mod select6 {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let c1 = make::<bool>(0);
         let c2 = make::<bool>(0);
         let c3 = make::<bool>(0);
 
-        go!(c1, c1.recv());
-        go!(c1, c2, c3, {
+        let t1 = go!(c1, c1.recv());
+        let t2 = go!(c1, c2, c3, {
             select! {
                 recv(c1.rx()) -> _ => panic!("dummy"),
                 recv(c2.rx()) -> _ => c3.send(true),
             }
             c1.recv();
         });
-        go!(c2, c2.send(true));
+        let t3 = go!(c2, c2.send(true));
 
         c3.recv();
         c1.send(true);
         c1.send(true);
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+        t3.join().unwrap();
     }
 }
 
@@ -742,45 +762,52 @@ mod select7 {
         }
     }
 
-    fn send1(recv: fn(Chan<i32>)) {
+    fn send1(recv: fn(Chan<i32>)) -> JoinHandle<()> {
         let c = make::<i32>(1);
-        go!(c, recv(c));
+        let t = go!(c, recv(c));
         thread::yield_now();
         c.send(1);
+        t
     }
 
-    fn send2(recv: fn(Chan<i32>)) {
+    fn send2(recv: fn(Chan<i32>)) -> JoinHandle<()> {
         let c = make::<i32>(1);
-        go!(c, recv(c));
+        let t = go!(c, recv(c));
         thread::yield_now();
         select! {
             send(c.tx(), 1) -> _ => ()
         }
+        t
     }
 
-    fn send3(recv: fn(Chan<i32>)) {
+    fn send3(recv: fn(Chan<i32>)) -> JoinHandle<()> {
         let c = make::<i32>(1);
-        go!(c, recv(c));
+        let t = go!(c, recv(c));
         thread::yield_now();
         let c2 = make::<i32>(1);
         select! {
             send(c.tx(), 1) -> _ => (),
             send(c2.tx(), 1) -> _ => ()
         }
+        t
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn main() {
-        send1(recv1);
-        send2(recv1);
-        send3(recv1);
-        send1(recv2);
-        send2(recv2);
-        send3(recv2);
-        send1(recv3);
-        send2(recv3);
-        send3(recv3);
+        let mut ts = Vec::with_capacity(9);
+        ts.push(send1(recv1));
+        ts.push(send2(recv1));
+        ts.push(send3(recv1));
+        ts.push(send1(recv2));
+        ts.push(send2(recv2));
+        ts.push(send3(recv2));
+        ts.push(send1(recv3));
+        ts.push(send2(recv3));
+        ts.push(send3(recv3));
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 }
 
@@ -858,7 +885,7 @@ mod chan_test {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn test_chan() {
         const N: i32 = 200;
 
@@ -868,13 +895,13 @@ mod chan_test {
                 let c = make::<i32>(cap as usize);
 
                 let recv1 = Arc::new(Mutex::new(false));
-                go!(c, recv1, {
+                let t1 = go!(c, recv1, {
                     c.recv();
                     *recv1.lock().unwrap() = true;
                 });
 
                 let recv2 = Arc::new(Mutex::new(false));
-                go!(c, recv2, {
+                let t2 = go!(c, recv2, {
                     c.recv();
                     *recv2.lock().unwrap() = true;
                 });
@@ -897,6 +924,9 @@ mod chan_test {
 
                 c.send(0);
                 c.send(0);
+
+                t1.join().unwrap();
+                t2.join().unwrap();
             }
 
             {
@@ -907,7 +937,7 @@ mod chan_test {
                 }
 
                 let sent = Arc::new(Mutex::new(0));
-                go!(sent, c, {
+                let t = go!(sent, c, {
                     c.send(0);
                     *sent.lock().unwrap() = 1;
                 });
@@ -924,6 +954,8 @@ mod chan_test {
                     default => {}
                 }
                 c.recv();
+
+                t.join().unwrap();
             }
 
             {
@@ -954,7 +986,7 @@ mod chan_test {
                 let c = make::<i32>(cap as usize);
                 let done = make::<bool>(0);
 
-                go!(c, done, {
+                let t = go!(c, done, {
                     let v = c.try_recv();
                     done.send(v.is_none());
                 });
@@ -965,13 +997,15 @@ mod chan_test {
                 if !done.recv().unwrap() {
                     panic!();
                 }
+
+                t.join().unwrap();
             }
 
             {
                 // Send 100 integers,
                 // ensure that we receive them non-corrupted in FIFO order.
                 let c = make::<i32>(cap as usize);
-                go!(c, {
+                let t1 = go!(c, {
                     for i in 0..100 {
                         c.send(i);
                     }
@@ -983,7 +1017,7 @@ mod chan_test {
                 }
 
                 // Same, but using recv2.
-                go!(c, {
+                let t2 = go!(c, {
                     for i in 0..100 {
                         c.send(i);
                     }
@@ -993,12 +1027,15 @@ mod chan_test {
                         panic!();
                     }
                 }
+
+                t1.join().unwrap();
+                t2.join().unwrap();
             }
         }
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_nonblock_recv_race() {
         const N: usize = 1000;
 
@@ -1020,7 +1057,7 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_nonblock_select_race() {
         const N: usize = 1000;
 
@@ -1030,7 +1067,7 @@ mod chan_test {
             let c2 = make::<i32>(1);
             c1.send(1);
 
-            go!(c1, c2, done, {
+            let t = go!(c1, c2, done, {
                 select! {
                     recv(c1.rx()) -> _ => {}
                     recv(c2.rx()) -> _ => {}
@@ -1050,11 +1087,12 @@ mod chan_test {
             if !done.recv().unwrap() {
                 panic!("no chan is ready");
             }
+            t.join().unwrap();
         }
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_nonblock_select_race2() {
         const N: usize = 1000;
 
@@ -1064,7 +1102,7 @@ mod chan_test {
             let c2 = make::<i32>(0);
             c1.send(1);
 
-            go!(c1, c2, done, {
+            let t = go!(c1, c2, done, {
                 select! {
                     recv(c1.rx()) -> _ => {}
                     recv(c2.rx()) -> _ => {}
@@ -1084,15 +1122,16 @@ mod chan_test {
             if !done.recv().unwrap() {
                 panic!("no chan is ready");
             }
+            t.join().unwrap();
         }
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_self_select() {
         // Ensure that send/recv on the same chan in select
         // does not crash nor deadlock.
 
+        let mut ts = Vec::with_capacity(4);
         for &cap in &[0, 10] {
             let wg = WaitGroup::new();
             wg.add(2);
@@ -1100,7 +1139,7 @@ mod chan_test {
 
             for p in 0..2 {
                 let p = p;
-                go!(wg, p, c, {
+                let t = go!(wg, p, c, {
                     defer! { wg.done() }
                     for i in 0..1000 {
                         if p == 0 || i % 2 == 0 {
@@ -1124,14 +1163,19 @@ mod chan_test {
                         }
                     }
                 });
+                ts.push(t);
             }
             wg.wait();
+        }
+        for t in ts {
+            t.join().unwrap();
         }
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_select_stress() {
+        let mut ts = Vec::with_capacity(10);
         let c = vec![
             make::<i32>(0),
             make::<i32>(0),
@@ -1151,21 +1195,21 @@ mod chan_test {
         wg.add(10);
 
         for k in 0..4 {
-            go!(k, c, wg, {
+            ts.push(go!(k, c, wg, {
                 for _ in 0..N {
                     c[k].send(0);
                 }
                 wg.done();
-            });
-            go!(k, c, wg, {
+            }));
+            ts.push(go!(k, c, wg, {
                 for _ in 0..N {
                     c[k].recv();
                 }
                 wg.done();
-            });
+            }));
         }
 
-        go!(c, wg, {
+        ts.push(go!(c, wg, {
             let mut n = [0; 4];
             let mut c1 = c.iter().map(|c| Some(c.rx().clone())).collect::<Vec<_>>();
 
@@ -1197,9 +1241,9 @@ mod chan_test {
                 }
             }
             wg.done();
-        });
+        }));
 
-        go!(c, wg, {
+        ts.push(go!(c, wg, {
             let mut n = [0; 4];
             let mut c1 = c.iter().map(|c| Some(c.tx().clone())).collect::<Vec<_>>();
 
@@ -1231,13 +1275,15 @@ mod chan_test {
                 }
             }
             wg.done();
-        });
+        }));
 
         wg.wait();
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_select_fairness() {
         const TRIALS: usize = 10000;
 
@@ -1256,7 +1302,7 @@ mod chan_test {
         let wg = WaitGroup::new();
 
         wg.add(1);
-        go!(wg, c1, c2, c3, c4, out, done, {
+        let t = go!(wg, c1, c2, c3, c4, out, done, {
             defer! { wg.done() };
             loop {
                 let b;
@@ -1299,6 +1345,7 @@ mod chan_test {
 
         done.close();
         wg.wait();
+        t.join().unwrap();
     }
 
     #[test]
@@ -1322,23 +1369,24 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_pseudo_random_send() {
         const N: usize = 100;
+        let mut ts = Vec::with_capacity(N);
 
         for cap in 0..N {
             let c = make::<i32>(cap);
             let l = Arc::new(Mutex::new(vec![0i32; N]));
             let done = make::<bool>(0);
 
-            go!(c, done, l, {
+            ts.push(go!(c, done, l, {
                 let mut l = l.lock().unwrap();
                 for i in 0..N {
                     thread::yield_now();
                     l[i] = c.recv().unwrap();
                 }
                 done.send(true);
-            });
+            }));
 
             for _ in 0..N {
                 select! {
@@ -1362,6 +1410,10 @@ mod chan_test {
                 );
             }
         }
+
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 
     #[test]
@@ -1376,10 +1428,11 @@ mod chan_test {
         let r = make::<i32>(NWORK * 3);
 
         let wg = WaitGroup::new();
+        let mut ts = Vec::with_capacity(NWORK + 1);
         for i in 0..NWORK {
             wg.add(1);
             let w = i;
-            go!(q, r, wg, pn, {
+            ts.push(go!(q, r, wg, pn, {
                 for v in &q {
                     if pn[w % pn.len()] == v {
                         thread::yield_now();
@@ -1387,11 +1440,11 @@ mod chan_test {
                     r.send(v);
                 }
                 wg.done();
-            });
+            }));
         }
 
         let expect = Arc::new(Mutex::new(0));
-        go!(q, r, expect, wg, pn, {
+        ts.push(go!(q, r, expect, wg, pn, {
             for i in 0..NITER {
                 let v = pn[i % pn.len()];
                 *expect.lock().unwrap() += v;
@@ -1400,7 +1453,7 @@ mod chan_test {
             q.close();
             wg.wait();
             r.close();
-        });
+        }));
 
         let mut n = 0;
         let mut s = 0;
@@ -1412,10 +1465,14 @@ mod chan_test {
         if n != NITER || s != *expect.lock().unwrap() {
             panic!();
         }
+
+        for t in ts {
+            t.join().unwrap();
+        }
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
+    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn test_select_duplicate_channel() {
         // This test makes sure we can queue a G on
         // the same channel multiple times.
@@ -1423,7 +1480,7 @@ mod chan_test {
         let d = make::<i32>(0);
         let e = make::<i32>(0);
 
-        go!(c, d, e, {
+        let t1 = go!(c, d, e, {
             select! {
                 recv(c.rx()) -> _ => {}
                 recv(d.rx()) -> _ => {}
@@ -1433,12 +1490,15 @@ mod chan_test {
         });
         thread::sleep(ms(1));
 
-        go!(c, c.recv());
+        let t2 = go!(c, c.recv());
         thread::sleep(ms(1));
 
         d.send(7);
         e.recv();
         c.send(8);
+
+        t1.join().unwrap();
+        t2.join().unwrap();
     }
 }
 
