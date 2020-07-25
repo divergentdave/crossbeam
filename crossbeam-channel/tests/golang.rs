@@ -1131,6 +1131,11 @@ mod chan_test {
         // Ensure that send/recv on the same chan in select
         // does not crash nor deadlock.
 
+        #[cfg(not(miri))]
+        const COUNT: usize = 1000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
+
         let mut ts = Vec::with_capacity(4);
         for &cap in &[0, 10] {
             let wg = WaitGroup::new();
@@ -1141,7 +1146,7 @@ mod chan_test {
                 let p = p;
                 let t = go!(wg, p, c, {
                     defer! { wg.done() }
-                    for i in 0..1000 {
+                    for i in 0..COUNT {
                         if p == 0 || i % 2 == 0 {
                             select! {
                                 send(c.tx(), p) -> _ => {}
@@ -1183,7 +1188,10 @@ mod chan_test {
             make::<i32>(3),
         ];
 
-        const N: usize = 10000;
+        #[cfg(not(miri))]
+        const N: usize = 10_000;
+        #[cfg(miri)]
+        const N: usize = 100;
 
         // There are 4 goroutines that send N values on each of the chans,
         // + 4 goroutines that receive N values on each of the chans,
@@ -1285,7 +1293,10 @@ mod chan_test {
 
     #[test]
     fn test_select_fairness() {
-        const TRIALS: usize = 10000;
+        #[cfg(not(miri))]
+        const TRIALS: usize = 10_000;
+        #[cfg(miri)]
+        const TRIALS: usize = 100;
 
         let c1 = make::<u8>(TRIALS + 1);
         let c2 = make::<u8>(TRIALS + 1);
