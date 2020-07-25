@@ -5,6 +5,7 @@ use crossbeam_utils::thread::scope;
 use rand::{thread_rng, Rng};
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn smoke() {
     let q = ArrayQueue::new(1);
 
@@ -17,6 +18,7 @@ fn smoke() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn capacity() {
     for i in 1..10 {
         let q = ArrayQueue::<i32>::new(i);
@@ -31,6 +33,7 @@ fn zero_capacity() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn len_empty_full() {
     let q = ArrayQueue::new(2);
 
@@ -58,6 +61,7 @@ fn len_empty_full() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, second thread never runs")]
 fn len() {
     const COUNT: usize = 25_000;
     const CAP: usize = 1000;
@@ -115,6 +119,7 @@ fn len() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, only the first thread runs")]
 fn spsc() {
     const COUNT: usize = 100_000;
 
@@ -143,6 +148,7 @@ fn spsc() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, only the first thread runs")]
 fn mpmc() {
     const COUNT: usize = 25_000;
     const THREADS: usize = 4;
@@ -179,6 +185,7 @@ fn mpmc() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, neither for loop body that pushes to the queue ever runs")]
 fn drops() {
     const RUNS: usize = 100;
 

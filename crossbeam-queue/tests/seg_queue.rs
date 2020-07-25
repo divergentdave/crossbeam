@@ -53,6 +53,7 @@ fn len() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, only one thread ever runs")]
 fn spsc() {
     const COUNT: usize = 100_000;
 
@@ -80,6 +81,7 @@ fn spsc() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, only one thread runs")]
 fn mpmc() {
     const COUNT: usize = 25_000;
     const THREADS: usize = 4;
@@ -116,6 +118,7 @@ fn mpmc() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, neither for loop body that pushes to the queue ever runs")]
 fn drops() {
     static DROPS: AtomicUsize = AtomicUsize::new(0);
 

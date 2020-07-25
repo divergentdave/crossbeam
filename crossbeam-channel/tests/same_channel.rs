@@ -7,6 +7,7 @@ fn ms(ms: u64) -> Duration {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn after_same_channel() {
     let r = after(ms(50));
 
@@ -23,6 +24,7 @@ fn after_same_channel() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn array_same_channel() {
     let (s, r) = bounded::<usize>(1);
 
@@ -70,6 +72,7 @@ fn never_same_channel() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn tick_same_channel() {
     let r = tick(ms(50));
 

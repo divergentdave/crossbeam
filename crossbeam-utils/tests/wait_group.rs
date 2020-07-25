@@ -7,6 +7,7 @@ use crossbeam_utils::sync::WaitGroup;
 const THREADS: usize = 10;
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn wait() {
     let wg = WaitGroup::new();
     let (tx, rx) = mpsc::channel();
@@ -36,6 +37,7 @@ fn wait() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn wait_and_drop() {
     let wg = WaitGroup::new();
     let (tx, rx) = mpsc::channel();

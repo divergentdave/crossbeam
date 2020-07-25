@@ -265,6 +265,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "deadlocks, body of child thread never runs")]
     fn port_gone_concurrent() {
         let (tx, rx) = channel::<i32>();
         let t = thread::spawn(move || {
@@ -275,6 +276,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "deadlocks, body of child thread never runs")]
     fn port_gone_concurrent_shared() {
         let (tx, rx) = channel::<i32>();
         let tx2 = tx.clone();
@@ -644,6 +646,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn oneshot_single_thread_recv_timeout() {
         let (tx, rx) = channel();
         tx.send(()).unwrap();
@@ -657,6 +660,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_two_threads() {
         let (tx, rx) = channel();
         let stress = stress_factor() + 100;
@@ -688,6 +692,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn recv_timeout_upgrade() {
         let (tx, rx) = channel::<()>();
         let timeout = Duration::from_millis(1);
@@ -699,6 +704,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_shared() {
         let (tx, rx) = channel();
         let stress = stress_factor() + 100;
@@ -746,6 +752,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn shared_recv_timeout() {
         let (tx, rx) = channel();
         let total = 5;
@@ -842,6 +849,7 @@ mod channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "deadlocks, neither for loop body ever runs")]
     fn test_recv_try_iter() {
         let (request_tx, request_rx) = channel();
         let (response_tx, response_rx) = channel();
@@ -970,6 +978,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn smoke() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(1).unwrap();
@@ -977,12 +986,14 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn drop_full() {
         let (tx, _rx) = sync_channel::<Box<isize>>(1);
         tx.send(Box::new(1)).unwrap();
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn smoke_shared() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(1).unwrap();
@@ -993,6 +1004,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn recv_timeout() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(
@@ -1092,6 +1104,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_two_threads() {
         let (tx, rx) = sync_channel::<i32>(0);
 
@@ -1118,6 +1131,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_shared() {
         const AMT: u32 = 1000;
         const NTHREADS: u32 = 8;
@@ -1229,6 +1243,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_send_then_recv() {
         let (tx, rx) = sync_channel::<Box<i32>>(1);
         tx.send(Box::new(10)).unwrap();
@@ -1236,6 +1251,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_try_send_open() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(tx.try_send(10), Ok(()));
@@ -1256,6 +1272,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_try_recv_open() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(10).unwrap();
@@ -1270,6 +1287,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_try_recv_closed_with_data() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(10).unwrap();
@@ -1279,6 +1297,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_peek_data() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
@@ -1364,6 +1383,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn oneshot_multi_thread_recv_close_stress() {
         let stress_factor = stress_factor();
         let mut ts = Vec::with_capacity(2 * stress_factor);
@@ -1407,6 +1427,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn stream_send_recv_stress() {
         let stress_factor = stress_factor();
         let mut ts = Vec::with_capacity(2 * stress_factor);
@@ -1528,6 +1549,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn try_recv_states() {
         let (tx1, rx1) = sync_channel::<i32>(1);
         let (tx2, rx2) = sync_channel::<()>(1);
@@ -1599,6 +1621,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn send3() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(tx.send(1), Ok(()));
@@ -1637,6 +1660,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn try_send2() {
         let (tx, _rx) = sync_channel::<i32>(1);
         assert_eq!(tx.try_send(1), Ok(()));
@@ -1644,6 +1668,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn try_send3() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(tx.try_send(1), Ok(()));
@@ -1652,6 +1677,7 @@ mod sync_channel_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn issue_15761() {
         fn repro() {
             let (tx1, rx1) = sync_channel::<()>(3);
@@ -2043,6 +2069,7 @@ mod select_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn sync1() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(1).unwrap();

@@ -56,6 +56,7 @@ fn len_empty_full() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn try_recv() {
     let (s, r) = bounded(0);
 
@@ -76,6 +77,7 @@ fn try_recv() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv() {
     let (s, r) = bounded(0);
 
@@ -99,6 +101,7 @@ fn recv() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_timeout() {
     let (s, r) = bounded::<i32>(0);
 
@@ -120,6 +123,7 @@ fn recv_timeout() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn try_send() {
     let (s, r) = bounded(0);
 
@@ -140,6 +144,7 @@ fn try_send() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn send() {
     let (s, r) = bounded(0);
 
@@ -162,6 +167,7 @@ fn send() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn send_timeout() {
     let (s, r) = bounded(0);
 
@@ -216,6 +222,7 @@ fn len() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn disconnect_wakes_sender() {
     let (s, r) = bounded(0);
 
@@ -232,6 +239,7 @@ fn disconnect_wakes_sender() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn disconnect_wakes_receiver() {
     let (s, r) = bounded::<()>(0);
 
@@ -302,6 +310,7 @@ fn mpmc() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn stress_oneshot() {
     const COUNT: usize = 10_000;
 
@@ -317,6 +326,7 @@ fn stress_oneshot() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, neither for loop body ever runs")]
 fn stress_iter() {
     const COUNT: usize = 1000;
 
@@ -347,6 +357,7 @@ fn stress_iter() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn stress_timeout_two_threads() {
     const COUNT: usize = 100;
 
@@ -494,6 +505,7 @@ fn fairness_duplicates() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_in_send() {
     let (s, r) = bounded(0);
 

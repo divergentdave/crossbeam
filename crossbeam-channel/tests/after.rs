@@ -13,6 +13,7 @@ fn ms(ms: u64) -> Duration {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fire() {
     let start = Instant::now();
     let r = after(ms(50));
@@ -42,6 +43,7 @@ fn fire() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn capacity() {
     const COUNT: usize = 10;
 
@@ -52,6 +54,7 @@ fn capacity() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn len_empty_full() {
     let r = after(ms(50));
 
@@ -73,6 +76,7 @@ fn len_empty_full() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn try_recv() {
     let r = after(ms(200));
     assert!(r.try_recv().is_err());
@@ -89,6 +93,7 @@ fn try_recv() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn recv() {
     let start = Instant::now();
     let r = after(ms(50));
@@ -105,6 +110,7 @@ fn recv() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn recv_timeout() {
     let start = Instant::now();
     let r = after(ms(200));
@@ -127,6 +133,7 @@ fn recv_timeout() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn recv_two() {
     let r1 = after(ms(50));
     let r2 = after(ms(50));
@@ -149,6 +156,7 @@ fn recv_two() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn recv_race() {
     select! {
         recv(after(ms(50))) -> _ => {}
@@ -162,6 +170,7 @@ fn recv_race() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn stress_default() {
     const COUNT: usize = 10;
 
@@ -181,6 +190,7 @@ fn stress_default() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn select() {
     const THREADS: usize = 4;
     const COUNT: usize = 1000;
@@ -225,6 +235,7 @@ fn select() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn ready() {
     const THREADS: usize = 4;
     const COUNT: usize = 1000;
@@ -268,6 +279,7 @@ fn ready() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn stress_clone() {
     const RUNS: usize = 1000;
     const THREADS: usize = 10;
@@ -294,6 +306,7 @@ fn stress_clone() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness() {
     const COUNT: usize = 1000;
 
@@ -312,6 +325,7 @@ fn fairness() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness_duplicates() {
     const COUNT: usize = 1000;
 

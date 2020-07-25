@@ -1,6 +1,7 @@
 use crossbeam_skiplist::SkipMap;
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn smoke() {
     let m = SkipMap::new();
     m.insert(1, 10);
@@ -9,6 +10,7 @@ fn smoke() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn iter() {
     let s = SkipMap::new();
     for &x in &[4, 2, 12, 8, 7, 11, 5] {
@@ -33,6 +35,7 @@ fn iter() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn iter_range() {
     use std::ops::Bound::*;
     let s = SkipMap::new();

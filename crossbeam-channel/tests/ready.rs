@@ -56,6 +56,7 @@ fn smoke2() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn disconnected() {
     let (s1, r1) = unbounded::<i32>();
     let (s2, r2) = unbounded::<i32>();
@@ -141,6 +142,7 @@ fn default() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn timeout() {
     let (_s1, r1) = unbounded::<i32>();
     let (s2, r2) = unbounded::<i32>();
@@ -188,6 +190,7 @@ fn timeout() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn default_when_disconnected() {
     let (_, r) = unbounded::<i32>();
 
@@ -227,6 +230,7 @@ fn default_when_disconnected() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn default_only() {
     let start = Instant::now();
 
@@ -244,6 +248,7 @@ fn default_only() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn unblocks() {
     let (s1, r1) = bounded::<i32>(0);
     let (s2, r2) = bounded::<i32>(0);
@@ -287,6 +292,7 @@ fn unblocks() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn both_ready() {
     let (s1, r1) = bounded(0);
     let (s2, r2) = bounded(0);
@@ -344,6 +350,7 @@ fn cloning1() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn cloning2() {
     let (s1, r1) = unbounded::<()>();
     let (s2, r2) = unbounded::<()>();
@@ -594,6 +601,7 @@ fn stress_mixed() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn stress_timeout_two_threads() {
     const COUNT: usize = 20;
 
@@ -648,6 +656,7 @@ fn stress_timeout_two_threads() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn send_recv_same_channel() {
     let (s, r) = bounded::<i32>(0);
     let mut sel = Select::new();
@@ -667,6 +676,7 @@ fn send_recv_same_channel() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn channel_through_channel() {
     const COUNT: usize = 1000;
 
@@ -723,6 +733,7 @@ fn channel_through_channel() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness1() {
     const COUNT: usize = 10_000;
 
@@ -768,6 +779,7 @@ fn fairness1() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn fairness2() {
     const COUNT: usize = 100_000;
 

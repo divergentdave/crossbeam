@@ -198,6 +198,7 @@ fn stress() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, child threads never run")]
 fn no_starvation() {
     const THREADS: usize = 8;
     const COUNT: usize = 50_000;
@@ -257,6 +258,7 @@ fn no_starvation() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks")]
 fn destructors() {
     const THREADS: usize = 8;
     const COUNT: usize = 50_000;

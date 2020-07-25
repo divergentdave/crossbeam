@@ -55,6 +55,7 @@ fn recv_iter_break() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "deadlocks, neither for loop body ever runs")]
 fn recv_try_iter() {
     let (request_s, request_r) = unbounded();
     let (response_s, response_r) = unbounded();

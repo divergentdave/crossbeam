@@ -240,6 +240,7 @@ mod doubleselect {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let c1 = make::<i32>(0);
         let c2 = make::<i32>(0);
@@ -292,6 +293,7 @@ mod fifo {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn synch_fifo() {
         let ch = make::<i32>(0);
         let mut inp = make::<i32>(0);
@@ -320,6 +322,7 @@ mod goroutines {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let n = 100i32;
 
@@ -393,6 +396,7 @@ mod nonblock {
     const MAX_TRIES: usize = 10000; // Up to 100ms per test.
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let ticker = tick(Duration::new(0, 10_000)); // 10 us
         let sleep = || {
@@ -611,6 +615,7 @@ mod select {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn main() {
         let shift = Cell::new(0);
         let counter = Cell::new(0);
@@ -673,6 +678,7 @@ mod select4 {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn main() {
         let c = make::<i32>(1);
         let c1 = make::<i32>(0);
@@ -689,6 +695,7 @@ mod select6 {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let c1 = make::<bool>(0);
         let c2 = make::<bool>(0);
@@ -760,6 +767,7 @@ mod select7 {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         send1(recv1);
         send2(recv1);
@@ -807,6 +815,7 @@ mod sieve1 {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn main() {
         let primes = make::<i32>(1);
         go!(primes, sieve(primes));
@@ -846,6 +855,7 @@ mod chan_test {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_chan() {
         const N: i32 = 200;
 
@@ -985,6 +995,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_nonblock_recv_race() {
         const N: usize = 1000;
 
@@ -1006,6 +1017,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_nonblock_select_race() {
         const N: usize = 1000;
 
@@ -1039,6 +1051,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_nonblock_select_race2() {
         const N: usize = 1000;
 
@@ -1072,6 +1085,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_self_select() {
         // Ensure that send/recv on the same chan in select
         // does not crash nor deadlock.
@@ -1113,6 +1127,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_select_stress() {
         let c = vec![
             make::<i32>(0),
@@ -1219,6 +1234,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_select_fairness() {
         const TRIALS: usize = 10000;
 
@@ -1283,6 +1299,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_chan_send_interface() {
         struct Mt;
 
@@ -1302,6 +1319,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_pseudo_random_send() {
         const N: usize = 100;
 
@@ -1344,6 +1362,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_multi_consumer() {
         const NWORK: usize = 23;
         const NITER: usize = 271828;
@@ -1393,6 +1412,7 @@ mod chan_test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "the main thread terminated without waiting for other threads")]
     fn test_select_duplicate_channel() {
         // This test makes sure we can queue a G on
         // the same channel multiple times.
