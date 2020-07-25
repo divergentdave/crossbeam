@@ -203,7 +203,10 @@ macro_rules! go {
 mod doubleselect {
     use super::*;
 
+    #[cfg(not(miri))]
     const ITERATIONS: i32 = 10_000;
+    #[cfg(miri)]
+    const ITERATIONS: i32 = 100;
 
     fn sender(n: i32, c1: Chan<i32>, c2: Chan<i32>, c3: Chan<i32>, c4: Chan<i32>) {
         defer! { c1.close() }

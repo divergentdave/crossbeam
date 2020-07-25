@@ -316,13 +316,18 @@ mod channel_tests {
 
     #[test]
     fn stress() {
+        #[cfg(not(miri))]
+        const COUNT: usize = 10_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
+
         let (tx, rx) = channel::<i32>();
         let t = thread::spawn(move || {
-            for _ in 0..10000 {
+            for _ in 0..COUNT {
                 tx.send(1).unwrap();
             }
         });
-        for _ in 0..10000 {
+        for _ in 0..COUNT {
             assert_eq!(rx.recv().unwrap(), 1);
         }
         t.join().ok().unwrap();
@@ -330,7 +335,10 @@ mod channel_tests {
 
     #[test]
     fn stress_shared() {
-        const AMT: u32 = 10000;
+        #[cfg(not(miri))]
+        const AMT: u32 = 10_000;
+        #[cfg(miri)]
+        const AMT: u32 = 100;
         const NTHREADS: u32 = 8;
         let (tx, rx) = channel::<i32>();
 
@@ -742,11 +750,17 @@ mod channel_tests {
     #[test]
     fn recv_a_lot() {
         // Regression test that we don't run out of stack in scheduler context
+
+        #[cfg(not(miri))]
+        const COUNT: usize = 10_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
+
         let (tx, rx) = channel();
-        for _ in 0..10000 {
+        for _ in 0..COUNT {
             tx.send(()).unwrap();
         }
-        for _ in 0..10000 {
+        for _ in 0..COUNT {
             rx.recv().unwrap();
         }
     }
@@ -1091,13 +1105,17 @@ mod sync_channel_tests {
 
     #[test]
     fn stress() {
+        #[cfg(not(miri))]
+        const AMT: i32 = 10_000;
+        #[cfg(miri)]
+        const AMT: i32 = 100;
         let (tx, rx) = sync_channel::<i32>(0);
         let t = thread::spawn(move || {
-            for _ in 0..10000 {
+            for _ in 0..AMT {
                 tx.send(1).unwrap();
             }
         });
-        for _ in 0..10000 {
+        for _ in 0..AMT {
             assert_eq!(rx.recv().unwrap(), 1);
         }
         t.join().unwrap();
@@ -1106,10 +1124,15 @@ mod sync_channel_tests {
     #[test]
     #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_two_threads() {
+        #[cfg(not(miri))]
+        const AMT: i32 = 10_000;
+        #[cfg(miri)]
+        const AMT: i32 = 100;
+
         let (tx, rx) = sync_channel::<i32>(0);
 
         let t = thread::spawn(move || {
-            for _ in 0..10000 {
+            for _ in 0..AMT {
                 tx.send(1).unwrap();
             }
         });
@@ -1126,14 +1149,17 @@ mod sync_channel_tests {
             }
         }
 
-        assert_eq!(recv_count, 10000);
+        assert_eq!(recv_count, AMT);
         t.join().unwrap();
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_shared() {
+        #[cfg(not(miri))]
         const AMT: u32 = 1000;
+        #[cfg(miri)]
+        const AMT: u32 = 100;
         const NTHREADS: u32 = 8;
         let (tx, rx) = sync_channel::<i32>(0);
         let (dtx, drx) = sync_channel::<()>(0);
@@ -1179,7 +1205,10 @@ mod sync_channel_tests {
 
     #[test]
     fn stress_shared() {
+        #[cfg(not(miri))]
         const AMT: u32 = 1000;
+        #[cfg(miri)]
+        const AMT: u32 = 100;
         const NTHREADS: u32 = 8;
         let (tx, rx) = sync_channel::<i32>(0);
         let (dtx, drx) = sync_channel::<()>(0);
@@ -1471,11 +1500,17 @@ mod sync_channel_tests {
     #[test]
     fn recv_a_lot() {
         // Regression test that we don't run out of stack in scheduler context
-        let (tx, rx) = sync_channel(10000);
-        for _ in 0..10000 {
+
+        #[cfg(not(miri))]
+        const COUNT: usize = 10_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
+
+        let (tx, rx) = sync_channel(COUNT);
+        for _ in 0..COUNT {
             tx.send(()).unwrap();
         }
-        for _ in 0..10000 {
+        for _ in 0..COUNT {
             rx.recv().unwrap();
         }
     }
@@ -1818,7 +1853,10 @@ mod select_tests {
 
     #[test]
     fn stress() {
-        const AMT: i32 = 10000;
+        #[cfg(not(miri))]
+        const AMT: i32 = 10_000;
+        #[cfg(miri)]
+        const AMT: i32 = 100;
         let (tx1, rx1) = channel::<i32>();
         let (tx2, rx2) = channel::<i32>();
         let (tx3, rx3) = channel::<()>();

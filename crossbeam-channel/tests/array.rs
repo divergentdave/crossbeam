@@ -262,8 +262,14 @@ fn recv_after_disconnect() {
 
 #[test]
 fn len() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 250;
+    #[cfg(not(miri))]
     const CAP: usize = 1000;
+    #[cfg(miri)]
+    const CAP: usize = 100;
 
     let (s, r) = bounded(CAP);
 
@@ -358,7 +364,10 @@ fn disconnect_wakes_receiver() {
 #[test]
 #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn spsc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s, r) = bounded(3);
 
@@ -381,7 +390,10 @@ fn spsc() {
 #[test]
 #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn mpmc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let (s, r) = bounded::<usize>(3);
@@ -414,7 +426,10 @@ fn mpmc() {
 #[test]
 #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn stress_oneshot() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     for _ in 0..COUNT {
         let (s, r) = bounded(1);
@@ -430,7 +445,10 @@ fn stress_oneshot() {
 #[test]
 #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn stress_iter() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (request_s, request_r) = bounded(1);
     let (response_s, response_r) = bounded(1);
@@ -498,7 +516,14 @@ fn stress_timeout_two_threads() {
 
 #[test]
 fn drops() {
+    #[cfg(not(miri))]
     const RUNS: usize = 100;
+    #[cfg(miri)]
+    const RUNS: usize = 2;
+    #[cfg(not(miri))]
+    const MAX_STEPS: usize = 10_000;
+    #[cfg(miri)]
+    const MAX_STEPS: usize = 100;
 
     static DROPS: AtomicUsize = AtomicUsize::new(0);
 
@@ -514,7 +539,7 @@ fn drops() {
     let mut rng = thread_rng();
 
     for _ in 0..RUNS {
-        let steps = rng.gen_range(0, 10_000);
+        let steps = rng.gen_range(0, MAX_STEPS);
         let additional = rng.gen_range(0, 50);
 
         DROPS.store(0, Ordering::SeqCst);
@@ -548,7 +573,10 @@ fn drops() {
 
 #[test]
 fn linearizable() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let (s, r) = bounded(THREADS);
@@ -568,7 +596,10 @@ fn linearizable() {
 
 #[test]
 fn fairness() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = bounded::<()>(COUNT);
     let (s2, r2) = bounded::<()>(COUNT);
@@ -590,7 +621,10 @@ fn fairness() {
 
 #[test]
 fn fairness_duplicates() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s, r) = bounded::<()>(COUNT);
 

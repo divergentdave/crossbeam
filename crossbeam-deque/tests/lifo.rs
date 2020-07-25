@@ -71,7 +71,10 @@ fn is_empty() {
 
 #[test]
 fn spsc() {
+    #[cfg(not(miri))]
     const STEPS: usize = 50_000;
+    #[cfg(miri)]
+    const STEPS: usize = 50;
 
     let w = Worker::new_lifo();
     let s = w.stealer();
@@ -100,7 +103,10 @@ fn spsc() {
 #[test]
 fn stampede() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
 
     let w = Worker::new_lifo();
 
@@ -141,7 +147,10 @@ fn stampede() {
 #[test]
 fn stress() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
 
     let w = Worker::new_lifo();
     let done = Arc::new(AtomicBool::new(false));
@@ -201,7 +210,10 @@ fn stress() {
 #[cfg_attr(miri, ignore = "deadlocks, child threads never run")]
 fn no_starvation() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
 
     let w = Worker::new_lifo();
     let done = Arc::new(AtomicBool::new(false));
@@ -261,8 +273,14 @@ fn no_starvation() {
 #[cfg_attr(miri, ignore = "deadlocks")]
 fn destructors() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
+    #[cfg(not(miri))]
     const STEPS: usize = 1000;
+    #[cfg(miri)]
+    const STEPS: usize = 10;
 
     struct Elem(usize, Arc<Mutex<Vec<usize>>>);
 

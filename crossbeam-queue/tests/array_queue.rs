@@ -63,8 +63,14 @@ fn len_empty_full() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, second thread never runs")]
 fn len() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 2_500;
+    #[cfg(not(miri))]
     const CAP: usize = 1000;
+    #[cfg(miri)]
+    const CAP: usize = 100;
 
     let q = ArrayQueue::new(CAP);
     assert_eq!(q.len(), 0);
@@ -121,7 +127,10 @@ fn len() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, only the first thread runs")]
 fn spsc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let q = ArrayQueue::new(3);
 
@@ -150,7 +159,10 @@ fn spsc() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, only the first thread runs")]
 fn mpmc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let q = ArrayQueue::<usize>::new(3);
@@ -187,7 +199,14 @@ fn mpmc() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, neither for loop body that pushes to the queue ever runs")]
 fn drops() {
+    #[cfg(not(miri))]
     const RUNS: usize = 100;
+    #[cfg(miri)]
+    const RUNS: usize = 10;
+    #[cfg(not(miri))]
+    const MAX_STEPS: usize = 10_000;
+    #[cfg(miri)]
+    const MAX_STEPS: usize = 100;
 
     static DROPS: AtomicUsize = AtomicUsize::new(0);
 
@@ -203,7 +222,7 @@ fn drops() {
     let mut rng = thread_rng();
 
     for _ in 0..RUNS {
-        let steps = rng.gen_range(0, 10_000);
+        let steps = rng.gen_range(0, MAX_STEPS);
         let additional = rng.gen_range(0, 50);
 
         DROPS.store(0, Ordering::SeqCst);
@@ -238,7 +257,10 @@ fn drops() {
 
 #[test]
 fn linearizable() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let q = ArrayQueue::new(THREADS);

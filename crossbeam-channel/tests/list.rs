@@ -246,7 +246,10 @@ fn disconnect_wakes_receiver() {
 
 #[test]
 fn spsc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s, r) = unbounded();
 
@@ -268,7 +271,10 @@ fn spsc() {
 
 #[test]
 fn mpmc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let (s, r) = unbounded::<usize>();
@@ -302,7 +308,10 @@ fn mpmc() {
 
 #[test]
 fn stress_oneshot() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     for _ in 0..COUNT {
         let (s, r) = unbounded();
@@ -318,7 +327,10 @@ fn stress_oneshot() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, neither for loop body ever runs")]
 fn stress_iter() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (request_s, request_r) = unbounded();
     let (response_s, response_r) = unbounded();
@@ -395,8 +407,16 @@ fn drops() {
 
     let mut rng = thread_rng();
 
-    for _ in 0..100 {
-        let steps = rng.gen_range(0, 10_000);
+    #[cfg(not(miri))]
+    const RUNS: usize = 100;
+    #[cfg(miri)]
+    const RUNS: usize = 2;
+    #[cfg(not(miri))]
+    const MAX_STEPS: usize = 10_000;
+    #[cfg(miri)]
+    const MAX_STEPS: usize = 100;
+    for _ in 0..RUNS {
+        let steps = rng.gen_range(0, MAX_STEPS);
         let additional = rng.gen_range(0, 1000);
 
         DROPS.store(0, Ordering::SeqCst);
@@ -430,7 +450,10 @@ fn drops() {
 
 #[test]
 fn linearizable() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let (s, r) = unbounded();
@@ -450,7 +473,10 @@ fn linearizable() {
 
 #[test]
 fn fairness() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = unbounded::<()>();
     let (s2, r2) = unbounded::<()>();
@@ -472,7 +498,10 @@ fn fairness() {
 
 #[test]
 fn fairness_duplicates() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s, r) = unbounded();
 

@@ -497,7 +497,10 @@ fn nesting() {
 
 #[test]
 fn stress_recv() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = unbounded();
     let (s2, r2) = bounded(5);
@@ -534,7 +537,10 @@ fn stress_recv() {
 
 #[test]
 fn stress_send() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = bounded(0);
     let (s2, r2) = bounded(0);
@@ -568,7 +574,10 @@ fn stress_send() {
 
 #[test]
 fn stress_mixed() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = bounded(0);
     let (s2, r2) = bounded(0);
@@ -735,7 +744,10 @@ fn channel_through_channel() {
 #[test]
 #[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness1() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = bounded::<()>(COUNT);
     let (s2, r2) = unbounded::<()>();
@@ -781,7 +793,10 @@ fn fairness1() {
 #[test]
 #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn fairness2() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = unbounded::<()>();
     let (s2, r2) = bounded::<()>(1);

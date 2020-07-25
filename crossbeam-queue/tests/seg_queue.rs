@@ -55,7 +55,10 @@ fn len() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, only one thread ever runs")]
 fn spsc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let q = SegQueue::new();
 
@@ -83,7 +86,10 @@ fn spsc() {
 #[test]
 #[cfg_attr(miri, ignore = "deadlocks, only one thread runs")]
 fn mpmc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let q = SegQueue::<usize>::new();

@@ -251,7 +251,10 @@ mod test {
         }
     }
 
-    const CONC_COUNT: i64 = 1000000;
+    #[cfg(not(miri))]
+    const CONC_COUNT: i64 = 1_000_000;
+    #[cfg(miri)]
+    const CONC_COUNT: i64 = 1_000;
 
     #[test]
     fn push_try_pop_1() {

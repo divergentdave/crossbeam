@@ -46,7 +46,10 @@ fn is_empty() {
 
 #[test]
 fn spsc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let q = Injector::new();
 
@@ -73,7 +76,10 @@ fn spsc() {
 
 #[test]
 fn mpmc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let q = Injector::new();
@@ -111,7 +117,10 @@ fn mpmc() {
 #[test]
 fn stampede() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
 
     let q = Injector::new();
 
@@ -152,7 +161,10 @@ fn stampede() {
 #[test]
 fn stress() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
 
     let q = Injector::new();
     let done = Arc::new(AtomicBool::new(false));
@@ -212,7 +224,10 @@ fn stress() {
 #[cfg_attr(miri, ignore = "deadlocks, child threads never run")]
 fn no_starvation() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 50;
 
     let q = Injector::new();
     let done = Arc::new(AtomicBool::new(false));
@@ -271,8 +286,14 @@ fn no_starvation() {
 #[test]
 fn destructors() {
     const THREADS: usize = 8;
+    #[cfg(not(miri))]
     const COUNT: usize = 50_000;
+    #[cfg(miri)]
+    const COUNT: usize = 500;
+    #[cfg(not(miri))]
     const STEPS: usize = 1000;
+    #[cfg(miri)]
+    const STEPS: usize = 10;
 
     struct Elem(usize, Arc<Mutex<Vec<usize>>>);
 

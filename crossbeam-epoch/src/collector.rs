@@ -182,13 +182,18 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
     fn pin_holds_advance() {
+        #[cfg(not(miri))]
+        const COUNT: usize = 500_000;
+        #[cfg(miri)]
+        const COUNT: usize = 500;
+
         let collector = Collector::new();
 
         thread::scope(|scope| {
             for _ in 0..NUM_THREADS {
                 scope.spawn(|_| {
                     let handle = collector.register();
-                    for _ in 0..500_000 {
+                    for _ in 0..COUNT {
                         let guard = &handle.pin();
 
                         let before = collector.global.epoch.load(Ordering::Relaxed);
@@ -206,7 +211,10 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
     fn incremental() {
+        #[cfg(not(miri))]
         const COUNT: usize = 100_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
         static DESTROYS: AtomicUsize = AtomicUsize::new(0);
 
         let collector = Collector::new();
@@ -257,7 +265,11 @@ mod tests {
             }
         }
 
-        for _ in 0..100_000 {
+        #[cfg(not(miri))]
+        const COLLECT_COUNT: usize = 100_000;
+        #[cfg(miri)]
+        const COLLECT_COUNT: usize = 100;
+        for _ in 0..COLLECT_COUNT {
             collector.global.collect(&handle.pin());
         }
         assert!(DESTROYS.load(Ordering::Relaxed) < COUNT);
@@ -274,7 +286,10 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
     fn count_drops() {
+        #[cfg(not(miri))]
         const COUNT: usize = 100_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
         static DROPS: AtomicUsize = AtomicUsize::new(0);
 
         struct Elem(i32);
@@ -308,7 +323,10 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
     fn count_destroy() {
+        #[cfg(not(miri))]
         const COUNT: usize = 100_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
         static DESTROYS: AtomicUsize = AtomicUsize::new(0);
 
         let collector = Collector::new();
@@ -412,7 +430,10 @@ mod tests {
     #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
     fn stress() {
         const THREADS: usize = 8;
+        #[cfg(not(miri))]
         const COUNT: usize = 100_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
         static DROPS: AtomicUsize = AtomicUsize::new(0);
 
         struct Elem(i32);

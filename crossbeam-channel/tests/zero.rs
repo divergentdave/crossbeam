@@ -193,7 +193,10 @@ fn send_timeout() {
 
 #[test]
 fn len() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
 
     let (s, r) = bounded(0);
 
@@ -257,7 +260,10 @@ fn disconnect_wakes_receiver() {
 
 #[test]
 fn spsc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 100_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s, r) = bounded(0);
 
@@ -279,7 +285,10 @@ fn spsc() {
 
 #[test]
 fn mpmc() {
+    #[cfg(not(miri))]
     const COUNT: usize = 25_000;
+    #[cfg(miri)]
+    const COUNT: usize = 25;
     const THREADS: usize = 4;
 
     let (s, r) = bounded::<usize>(0);
@@ -409,8 +418,16 @@ fn drops() {
 
     let mut rng = thread_rng();
 
-    for _ in 0..100 {
-        let steps = rng.gen_range(0, 3_000);
+    #[cfg(not(miri))]
+    const RUNS: usize = 100;
+    #[cfg(miri)]
+    const RUNS: usize = 2;
+    #[cfg(not(miri))]
+    const MAX_STEPS: usize = 3_000;
+    #[cfg(miri)]
+    const MAX_STEPS: usize = 30;
+    for _ in 0..RUNS {
+        let steps = rng.gen_range(0, MAX_STEPS);
 
         DROPS.store(0, Ordering::SeqCst);
         let (s, r) = bounded::<DropCounter>(0);
@@ -439,7 +456,10 @@ fn drops() {
 
 #[test]
 fn fairness() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s1, r1) = bounded::<()>(0);
     let (s2, r2) = bounded::<()>(0);
@@ -470,7 +490,10 @@ fn fairness() {
 
 #[test]
 fn fairness_duplicates() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (s, r) = bounded::<()>(0);
 
