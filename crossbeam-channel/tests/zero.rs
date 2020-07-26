@@ -320,7 +320,10 @@ fn mpmc() {
 
 #[test]
 fn stress_oneshot() {
+    #[cfg(not(miri))]
     const COUNT: usize = 10_000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     for _ in 0..COUNT {
         let (s, r) = bounded(0);

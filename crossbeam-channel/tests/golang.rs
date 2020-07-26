@@ -1374,7 +1374,10 @@ mod chan_test {
 
     #[test]
     fn test_pseudo_random_send() {
+        #[cfg(not(miri))]
         const N: usize = 100;
+        #[cfg(miri)]
+        const N: usize = 25;
         let mut ts = Vec::with_capacity(N);
 
         for cap in 0..N {
