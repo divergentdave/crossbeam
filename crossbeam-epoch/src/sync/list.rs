@@ -370,7 +370,7 @@ mod tests {
     /// Checks whether the list retains inserted elements
     /// and returns them in the correct order.
     #[test]
-    #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn insert() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -410,7 +410,7 @@ mod tests {
     /// Checks whether elements can be removed from the list and whether
     /// the correct elements are removed.
     #[test]
-    #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn delete() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -451,7 +451,7 @@ mod tests {
 
     /// Contends the list on insert and delete operations to make sure they can run concurrently.
     #[test]
-    #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn insert_delete_multi() {
         let collector = Collector::new();
 
@@ -494,7 +494,7 @@ mod tests {
 
     /// Contends the list on iteration to make sure that it can be iterated over concurrently.
     #[test]
-    #[cfg_attr(miri, ignore)] // UB: deallocating while item is protected
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn iter_multi() {
         let collector = Collector::new();
 
