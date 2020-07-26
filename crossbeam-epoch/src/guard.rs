@@ -271,7 +271,22 @@ impl Guard {
     ///
     /// [`unprotected`]: fn.unprotected.html
     pub unsafe fn defer_destroy<T>(&self, ptr: Shared<'_, T>) {
-        self.defer_unchecked(move || ptr.into_owned());
+        #[cfg(miri)]
+        // This const pointer is created and moved into the closure below so that Miri can tell
+        // the pointed-to memory has not been leaked. Since `Atomic` is a tagged pointer stored as
+        // an `AtomicUsize`, it has gone through pointer-to-int conversion, and is opaque to the
+        // leak report logic.
+        let miri_leak_tracking_ptr = ptr
+            .as_ref()
+            .map(|r| r as *const T)
+            .unwrap_or_else(core::ptr::null);
+
+        self.defer_unchecked(move || {
+            #[cfg(miri)]
+            let _miri_leak_tracking_ptr = miri_leak_tracking_ptr;
+
+            ptr.into_owned()
+        });
     }
 
     /// Clears up the thread-local cache of deferred functions by executing them or moving into the
