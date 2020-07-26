@@ -17,7 +17,17 @@ pub struct Entry {
     /// The next entry in the linked list.
     /// If the tag is 1, this entry is marked as deleted.
     next: Atomic<Entry>,
+    #[cfg(miri)]
+    /// A const pointer copy of the next entry in the linked list. This additional field is present
+    /// so that Miri can follow the raw pointer when checking for memory leaks upon program exit.
+    /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
+    /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
+    /// static variables.)
+    miri_leak_tracking_next: core::cell::RefCell<*const Entry>,
 }
+
+#[cfg(miri)]
+unsafe impl Sync for Entry {}
 
 /// Implementing this trait asserts that the type `T` can be used as an element in the intrusive
 /// linked list defined in this module. `T` has to contain (or otherwise be linked to) an instance
@@ -97,9 +107,20 @@ pub struct List<T, C: IsElement<T> = T> {
     /// The head of the linked list.
     head: Atomic<Entry>,
 
+    #[cfg(miri)]
+    /// A const pointer copy of the head of the linked list. This additional field is present so
+    /// that Miri can follow the raw pointer when checking for memory leaks upon program exit.
+    /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
+    /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
+    /// static variables.)
+    miri_leak_tracking_head: core::cell::RefCell<*const Entry>,
+
     /// The phantom data for using `T` and `C`.
     _marker: PhantomData<(T, C)>,
 }
+
+#[cfg(miri)]
+unsafe impl<T: Sync, C: Sync + IsElement<T>> Sync for List<T, C> {}
 
 /// An iterator used for retrieving values from the list.
 pub struct Iter<'g, T, C: IsElement<T>> {
@@ -133,6 +154,8 @@ impl Default for Entry {
     fn default() -> Self {
         Self {
             next: Atomic::null(),
+            #[cfg(miri)]
+            miri_leak_tracking_next: core::cell::RefCell::new(core::ptr::null()),
         }
     }
 }
@@ -155,6 +178,8 @@ impl<T, C: IsElement<T>> List<T, C> {
     pub fn new() -> Self {
         Self {
             head: Atomic::null(),
+            #[cfg(miri)]
+            miri_leak_tracking_head: core::cell::RefCell::new(core::ptr::null()),
             _marker: PhantomData,
         }
     }
@@ -183,8 +208,34 @@ impl<T, C: IsElement<T>> List<T, C> {
             // Set the Entry of the to-be-inserted element to point to the previous successor of
             // `to`.
             entry.next.store(next, Relaxed);
+            #[cfg(miri)]
+            {
+                // Mirror the change to the next pointer to assist in identifying memory leaks.
+                // Round trip Shared => reference => *const in order to force int-to-pointer
+                // conversion in Miri.
+                entry.miri_leak_tracking_next.replace(
+                    next.as_ref()
+                        .map(|r| r as *const Entry)
+                        .unwrap_or_else(core::ptr::null),
+                );
+            }
             match to.compare_and_set_weak(next, entry_ptr, Release, guard) {
-                Ok(_) => break,
+                Ok(_) => {
+                    #[cfg(miri)]
+                    {
+                        // Once the head pointer has been successfully updated, mirror the change
+                        // in the raw pointer field, to assist in identifying memory leaks.
+                        // Round trip Shared => reference => *const in order to force
+                        // int-to-pointer conversion in Miri.
+                        self.miri_leak_tracking_head.replace(
+                            entry_ptr
+                                .as_ref()
+                                .map(|r| r as *const Entry)
+                                .unwrap_or_else(core::ptr::null),
+                        );
+                    }
+                    break;
+                }
                 // We lost the race or weak CAS failed spuriously. Update the successor and try
                 // again.
                 Err(err) => next = err.current,

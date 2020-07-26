@@ -22,6 +22,13 @@ use crate::{unprotected, Atomic, Guard, Owned, Shared};
 pub struct Queue<T> {
     head: CachePadded<Atomic<Node<T>>>,
     tail: CachePadded<Atomic<Node<T>>>,
+    #[cfg(miri)]
+    /// A const pointer copy of the head of the queue. This additional field is present so that
+    /// Miri can follow the raw pointer when checking for memory leaks upon program exit.
+    /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
+    /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
+    /// static variables.)
+    miri_leak_tracking_head: core::cell::RefCell<*const Node<T>>,
 }
 
 struct Node<T> {
@@ -34,6 +41,14 @@ struct Node<T> {
     data: MaybeUninit<T>,
 
     next: Atomic<Node<T>>,
+
+    #[cfg(miri)]
+    /// A const pointer copy of the next node in the queue. This additional field is present so
+    /// that Miri can follow the raw pointer when checking for memory leaks upon program exit.
+    /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
+    /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
+    /// static variables.)
+    miri_leak_tracking_next: core::cell::RefCell<*const Node<T>>,
 }
 
 // Any particular `T` should never be accessed concurrently, so no need for `Sync`.
@@ -46,15 +61,23 @@ impl<T> Queue<T> {
         let q = Queue {
             head: CachePadded::new(Atomic::null()),
             tail: CachePadded::new(Atomic::null()),
+            #[cfg(miri)]
+            miri_leak_tracking_head: core::cell::RefCell::new(core::ptr::null()),
         };
         let sentinel = Owned::new(Node {
             data: MaybeUninit::uninit(),
             next: Atomic::null(),
+            #[cfg(miri)]
+            miri_leak_tracking_next: core::cell::RefCell::new(core::ptr::null()),
         });
         unsafe {
             let guard = unprotected();
             let sentinel = sentinel.into_shared(guard);
             q.head.store(sentinel, Relaxed);
+            #[cfg(miri)]
+            {
+                q.miri_leak_tracking_head.replace(sentinel.deref());
+            }
             q.tail.store(sentinel, Relaxed);
             q
         }
@@ -83,6 +106,18 @@ impl<T> Queue<T> {
                 .compare_and_set(Shared::null(), new, Release, guard)
                 .is_ok();
             if result {
+                #[cfg(miri)]
+                unsafe {
+                    // Once the next pointer has been successfully updated, mirror the change
+                    // in the raw pointer field, to assist in identifying memory leaks.
+                    // Round trip Shared => reference => *const in order to force int-to-pointer
+                    // conversion in Miri.
+                    o.miri_leak_tracking_next.replace(
+                        new.as_ref()
+                            .map(|r| r as *const Node<T>)
+                            .unwrap_or_else(core::ptr::null),
+                    );
+                }
                 // try to move the tail pointer forward
                 let _ = self.tail.compare_and_set(onto, new, Release, guard);
             }
@@ -95,6 +130,8 @@ impl<T> Queue<T> {
         let new = Owned::new(Node {
             data: MaybeUninit::new(t),
             next: Atomic::null(),
+            #[cfg(miri)]
+            miri_leak_tracking_next: core::cell::RefCell::new(core::ptr::null()),
         });
         let new = Owned::into_shared(new, guard);
 
@@ -120,6 +157,14 @@ impl<T> Queue<T> {
                 self.head
                     .compare_and_set(head, next, Release, guard)
                     .map(|_| {
+                        #[cfg(miri)]
+                        {
+                            // The head pointer was successfully updated, so mirror the change in
+                            // the raw pointer field, to assist in identifying memory leaks.
+                            // Round trip Shared => reference => *const in order to force
+                            // int-to-pointer conversion in Miri.
+                            self.miri_leak_tracking_head.replace(n);
+                        }
                         let tail = self.tail.load(Relaxed, guard);
                         // Advance the tail so that we don't retire a pointer to a reachable node.
                         if head == tail {
@@ -151,6 +196,14 @@ impl<T> Queue<T> {
                 self.head
                     .compare_and_set(head, next, Release, guard)
                     .map(|_| {
+                        #[cfg(miri)]
+                        {
+                            // The head pointer was successfully updated, so mirror the change in
+                            // the raw pointer field, to assist in identifying memory leaks.
+                            // Round trip Shared => reference => *const in order to force
+                            // int-to-pointer conversion in Miri.
+                            self.miri_leak_tracking_head.replace(n);
+                        }
                         let tail = self.tail.load(Relaxed, guard);
                         // Advance the tail so that we don't retire a pointer to a reachable node.
                         if head == tail {
