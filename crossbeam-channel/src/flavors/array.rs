@@ -115,15 +115,17 @@ impl<T> Channel<T> {
         // Allocate a buffer of `cap` slots initialized
         // with stamps.
         let buffer = {
-            let mut v: Vec<Slot<T>> = (0..cap)
-                .map(|i| {
-                    // Set the stamp to `{ lap: 0, mark: 0, index: i }`.
-                    Slot {
-                        stamp: AtomicUsize::new(i),
-                        msg: UnsafeCell::new(MaybeUninit::uninit()),
-                    }
-                })
-                .collect();
+            let mut v: Vec<Slot<T>> = Vec::with_capacity(cap);
+            let mut i = 0;
+            v.resize_with(cap, || {
+                // Set the stamp to `{ lap: 0, mark: 0, index: i }`.
+                let slot = Slot {
+                    stamp: AtomicUsize::new(i),
+                    msg: UnsafeCell::new(MaybeUninit::uninit()),
+                };
+                i += 1;
+                slot
+            });
             let ptr = v.as_mut_ptr();
             mem::forget(v);
             ptr

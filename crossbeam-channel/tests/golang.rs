@@ -635,7 +635,6 @@ mod select {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn main() {
         let shift = Cell::new(0);
         let counter = Cell::new(0);
@@ -698,7 +697,6 @@ mod select4 {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn main() {
         let c = make::<i32>(1);
         let c1 = make::<i32>(0);
@@ -793,7 +791,7 @@ mod select7 {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
+    #[cfg_attr(miri, ignore = "the evaluated program deadlocked")]
     fn main() {
         let mut ts = Vec::with_capacity(9);
         ts.push(send1(recv1));
@@ -1035,7 +1033,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_nonblock_recv_race() {
         const N: usize = 1000;
 
@@ -1057,7 +1054,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_nonblock_select_race() {
         const N: usize = 1000;
 
@@ -1092,7 +1088,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_nonblock_select_race2() {
         const N: usize = 1000;
 
@@ -1178,7 +1173,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_select_stress() {
         let mut ts = Vec::with_capacity(10);
         let c = vec![
@@ -1360,7 +1354,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_chan_send_interface() {
         struct Mt;
 
@@ -1380,7 +1373,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn test_pseudo_random_send() {
         const N: usize = 100;
         let mut ts = Vec::with_capacity(N);

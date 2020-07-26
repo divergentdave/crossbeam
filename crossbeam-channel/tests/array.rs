@@ -31,7 +31,6 @@ fn smoke() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn capacity() {
     for i in 1..10 {
         let (s, r) = bounded::<()>(i);
@@ -41,7 +40,6 @@ fn capacity() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn len_empty_full() {
     let (s, r) = bounded(2);
 
@@ -362,7 +360,6 @@ fn disconnect_wakes_receiver() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn spsc() {
     #[cfg(not(miri))]
     const COUNT: usize = 100_000;
@@ -388,7 +385,6 @@ fn spsc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn mpmc() {
     #[cfg(not(miri))]
     const COUNT: usize = 25_000;
@@ -424,7 +420,6 @@ fn mpmc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn stress_oneshot() {
     #[cfg(not(miri))]
     const COUNT: usize = 10_000;
@@ -443,7 +438,6 @@ fn stress_oneshot() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn stress_iter() {
     #[cfg(not(miri))]
     const COUNT: usize = 100_000;
@@ -646,7 +640,6 @@ fn fairness_duplicates() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn recv_in_send() {
     let (s, _r) = bounded(1);
     s.send(()).unwrap();
@@ -668,7 +661,6 @@ fn recv_in_send() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn channel_through_channel() {
     const COUNT: usize = 1000;
 

@@ -3,7 +3,6 @@
 use crossbeam::select;
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn channel() {
     let (s, r) = crossbeam::channel::bounded(1);
 

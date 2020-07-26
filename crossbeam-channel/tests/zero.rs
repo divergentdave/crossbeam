@@ -319,7 +319,6 @@ fn mpmc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn stress_oneshot() {
     const COUNT: usize = 10_000;
 

@@ -992,7 +992,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn smoke() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(1).unwrap();
@@ -1000,14 +999,12 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn drop_full() {
         let (tx, _rx) = sync_channel::<Box<isize>>(1);
         tx.send(Box::new(1)).unwrap();
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn smoke_shared() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(1).unwrap();
@@ -1272,7 +1269,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_send_then_recv() {
         let (tx, rx) = sync_channel::<Box<i32>>(1);
         tx.send(Box::new(10)).unwrap();
@@ -1280,7 +1276,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_try_send_open() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(tx.try_send(10), Ok(()));
@@ -1301,7 +1296,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_try_recv_open() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(10).unwrap();
@@ -1316,7 +1310,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_try_recv_closed_with_data() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(10).unwrap();
@@ -1326,7 +1319,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn oneshot_single_thread_peek_data() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
@@ -1590,7 +1582,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn try_recv_states() {
         let (tx1, rx1) = sync_channel::<i32>(1);
         let (tx2, rx2) = sync_channel::<()>(1);
@@ -1662,7 +1653,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn send3() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(tx.send(1), Ok(()));
@@ -1701,7 +1691,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn try_send2() {
         let (tx, _rx) = sync_channel::<i32>(1);
         assert_eq!(tx.try_send(1), Ok(()));
@@ -1709,7 +1698,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn try_send3() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(tx.try_send(1), Ok(()));
@@ -1718,7 +1706,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn issue_15761() {
         fn repro() -> JoinHandle<()> {
             let (tx1, rx1) = sync_channel::<()>(3);
@@ -2120,7 +2107,6 @@ mod select_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
     fn sync1() {
         let (tx, rx) = sync_channel::<i32>(1);
         tx.send(1).unwrap();

@@ -960,7 +960,6 @@ fn matching_with_leftover() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn channel_through_channel() {
     const COUNT: usize = 1000;
 
@@ -1019,7 +1018,6 @@ fn channel_through_channel() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn linearizable_try() {
     #[cfg(not(miri))]
     const COUNT: usize = 100_000;
@@ -1181,7 +1179,6 @@ fn fairness1() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn fairness2() {
     #[cfg(not(miri))]
     const COUNT: usize = 10_000;

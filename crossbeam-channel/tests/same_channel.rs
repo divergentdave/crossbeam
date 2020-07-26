@@ -24,7 +24,6 @@ fn after_same_channel() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn array_same_channel() {
     let (s, r) = bounded::<usize>(1);
 
