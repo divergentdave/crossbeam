@@ -392,9 +392,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn destroy_array() {
+        #[cfg(not(miri))]
         const COUNT: usize = 100_000;
+        #[cfg(miri)]
+        const COUNT: usize = 100;
         static DESTROYS: AtomicUsize = AtomicUsize::new(0);
 
         let collector = Collector::new();
@@ -410,8 +413,9 @@ mod tests {
 
             let ptr = v.as_mut_ptr() as usize;
             let len = v.len();
+            let capacity = v.capacity();
             guard.defer_unchecked(move || {
-                drop(Vec::from_raw_parts(ptr as *const u8 as *mut u8, len, len));
+                drop(Vec::from_raw_parts(ptr as *const i32 as *mut i32, len, capacity));
                 DESTROYS.fetch_add(len, Ordering::Relaxed);
             });
             guard.flush();
