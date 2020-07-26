@@ -5,7 +5,6 @@ use crossbeam_utils::thread::scope;
 use rand::{thread_rng, Rng};
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn smoke() {
     let q = ArrayQueue::new(1);
 
@@ -18,7 +17,6 @@ fn smoke() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn capacity() {
     for i in 1..10 {
         let q = ArrayQueue::<i32>::new(i);
@@ -33,7 +31,6 @@ fn zero_capacity() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: incorrect layout on deallocation")]
 fn len_empty_full() {
     let q = ArrayQueue::new(2);
 
