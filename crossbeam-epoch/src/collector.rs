@@ -242,7 +242,7 @@ mod tests {
             let guard = &handle.pin();
             collector.global.collect(guard);
         }
-        assert!(DESTROYS.load(Ordering::Relaxed) == 100_000);
+        assert_eq!(DESTROYS.load(Ordering::Relaxed), COUNT);
     }
 
     #[test]
