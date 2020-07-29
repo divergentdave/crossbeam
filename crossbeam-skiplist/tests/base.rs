@@ -11,7 +11,7 @@ fn new() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn is_empty() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -34,7 +34,6 @@ fn is_empty() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn insert() {
     let guard = &epoch::pin();
     let insert = [0, 4, 2, 12, 8, 7, 11, 5];
@@ -52,7 +51,7 @@ fn insert() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn remove() {
     let guard = &epoch::pin();
     let insert = [0, 4, 2, 12, 8, 7, 11, 5];
@@ -89,7 +88,6 @@ fn remove() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn entry() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -115,7 +113,7 @@ fn entry() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn entry_remove() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -143,7 +141,7 @@ fn entry_remove() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn entry_reposition() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -164,7 +162,7 @@ fn entry_reposition() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn len() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -189,7 +187,7 @@ fn len() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn insert_and_remove() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -239,7 +237,6 @@ fn insert_and_remove() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn get() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -262,7 +259,6 @@ fn get() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn lower_bound() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -343,7 +339,6 @@ fn lower_bound() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn upper_bound() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -424,7 +419,7 @@ fn upper_bound() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn get_or_insert() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -444,7 +439,6 @@ fn get_or_insert() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn get_next_prev() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -479,7 +473,6 @@ fn get_next_prev() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn front_and_back() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -495,7 +488,7 @@ fn front_and_back() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
+#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn iter() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -521,7 +514,6 @@ fn iter() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn iter_range() {
     use crate::Bound::*;
     let guard = &epoch::pin();
@@ -744,7 +736,6 @@ fn iter_range() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn into_iter() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -767,7 +758,6 @@ fn into_iter() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn clear() {
     let guard = &mut epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
@@ -783,7 +773,6 @@ fn clear() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: trying to reborrow for SharedReadWrite, but parent tag does not have an appropriate item in the borrow stack")]
 fn drops() {
     static KEYS: AtomicUsize = AtomicUsize::new(0);
     static VALUES: AtomicUsize = AtomicUsize::new(0);
