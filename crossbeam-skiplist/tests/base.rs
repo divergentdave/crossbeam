@@ -773,6 +773,7 @@ fn clear() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
 fn drops() {
     static KEYS: AtomicUsize = AtomicUsize::new(0);
     static VALUES: AtomicUsize = AtomicUsize::new(0);
