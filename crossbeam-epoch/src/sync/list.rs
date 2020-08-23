@@ -98,7 +98,7 @@ pub trait IsElement<T> {
     ///
     /// The caller has to guarantee that the `Entry` is called with was retrieved from an instance
     /// of the element type (`T`).
-    unsafe fn finalize(_: &Entry, _: &Guard);
+    unsafe fn finalize(_: *const Entry, _: &Guard);
 }
 
 /// A lock-free, intrusive linked list of type `T`.
@@ -362,15 +362,14 @@ mod tests {
             entry
         }
 
-        unsafe fn finalize(entry: &Entry, guard: &Guard) {
-            guard.defer_destroy(Shared::from(Self::element_of(entry) as *const _));
+        unsafe fn finalize(entry: *const Entry, guard: &Guard) {
+            guard.defer_destroy(Shared::from(Self::element_of(&*entry) as *const _));
         }
     }
 
     /// Checks whether the list retains inserted elements
     /// and returns them in the correct order.
     #[test]
-    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn insert() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -410,7 +409,6 @@ mod tests {
     /// Checks whether elements can be removed from the list and whether
     /// the correct elements are removed.
     #[test]
-    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn delete() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -451,7 +449,6 @@ mod tests {
 
     /// Contends the list on insert and delete operations to make sure they can run concurrently.
     #[test]
-    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn insert_delete_multi() {
         let collector = Collector::new();
 
@@ -494,7 +491,6 @@ mod tests {
 
     /// Contends the list on iteration to make sure that it can be iterated over concurrently.
     #[test]
-    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn iter_multi() {
         let collector = Collector::new();
 

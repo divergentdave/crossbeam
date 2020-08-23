@@ -510,7 +510,7 @@ impl Local {
             self.epoch.store(Epoch::starting(), Ordering::Release);
 
             if self.handle_count.get() == 0 {
-                self.finalize();
+                Local::finalize(self);
             }
         }
     }
@@ -548,47 +548,50 @@ impl Local {
 
     /// Decrements the handle count.
     #[inline]
-    pub fn release_handle(&self) {
-        let guard_count = self.guard_count.get();
-        let handle_count = self.handle_count.get();
+    pub fn release_handle(ptr: *const Local) {
+        let local = unsafe { &*ptr };
+        let guard_count = local.guard_count.get();
+        let handle_count = local.handle_count.get();
         debug_assert!(handle_count >= 1);
-        self.handle_count.set(handle_count - 1);
+        local.handle_count.set(handle_count - 1);
 
         if guard_count == 0 && handle_count == 1 {
-            self.finalize();
+            Local::finalize(ptr);
         }
     }
 
     /// Removes the `Local` from the global linked list.
     #[cold]
-    fn finalize(&self) {
-        debug_assert_eq!(self.guard_count.get(), 0);
-        debug_assert_eq!(self.handle_count.get(), 0);
+    fn finalize(ptr: *const Local) {
+        let local = unsafe { &*ptr };
+        debug_assert_eq!(local.guard_count.get(), 0);
+        debug_assert_eq!(local.handle_count.get(), 0);
 
         // Temporarily increment handle count. This is required so that the following call to `pin`
         // doesn't call `finalize` again.
-        self.handle_count.set(1);
+        local.handle_count.set(1);
         unsafe {
             // Pin and move the local bag into the global queue. It's important that `push_bag`
             // doesn't defer destruction on any new garbage.
-            let guard = &self.pin();
-            self.global().push_bag(&mut *self.bag.get(), guard);
+            let guard = &local.pin();
+            local.global().push_bag(&mut *local.bag.get(), guard);
         }
         // Revert the handle count back to zero.
-        self.handle_count.set(0);
+        local.handle_count.set(0);
 
         unsafe {
             // Take the reference to the `Global` out of this `Local`. Since we're not protected
             // by a guard at this time, it's crucial that the reference is read before marking the
             // `Local` as deleted.
-            let collector: Collector = ptr::read(&*(*self.collector.get()));
+            let collector: Collector = ptr::read(&*(*local.collector.get()));
 
             // Mark this node in the linked list as deleted.
-            self.entry.delete(unprotected());
+            local.entry.delete(unprotected());
 
             // Finally, drop the reference to the global. Note that this might be the last reference
             // to the `Global`. If so, the global data will be destroyed and all deferred functions
-            // in its queue will be executed.
+            // in its queue will be executed. Note that this `Local` will also be deallocated, as it
+            // was marked for deletion above.
             drop(collector);
         }
     }
@@ -607,8 +610,8 @@ impl IsElement<Local> for Local {
         &*local_ptr
     }
 
-    unsafe fn finalize(entry: &Entry, guard: &Guard) {
-        guard.defer_destroy(Shared::from(Self::element_of(entry) as *const _));
+    unsafe fn finalize(entry: *const Entry, guard: &Guard) {
+        guard.defer_destroy(Shared::from(Self::element_of(&*entry) as *const _));
     }
 }
 

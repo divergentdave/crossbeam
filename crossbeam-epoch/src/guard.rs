@@ -399,7 +399,7 @@ impl Guard {
         defer! {
             if let Some(local) = unsafe { self.local.as_ref() } {
                 mem::forget(local.pin());
-                local.release_handle();
+                Local::release_handle(self.local);
             }
         }
 
