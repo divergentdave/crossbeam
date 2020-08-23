@@ -121,6 +121,7 @@ mod tests {
     const NUM_THREADS: usize = 8;
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn pin_reentrant() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -140,6 +141,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn flush_local_bag() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -161,6 +163,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn garbage_buffering() {
         let collector = Collector::new();
         let handle = collector.register();
@@ -177,6 +180,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn pin_holds_advance() {
         #[cfg(not(miri))]
         const COUNT: usize = 500_000;
@@ -205,6 +209,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn incremental() {
         #[cfg(not(miri))]
         const COUNT: usize = 100_000;
@@ -241,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn buffering() {
         const COUNT: usize = 10;
         static DESTROYS: AtomicUsize = AtomicUsize::new(0);
@@ -278,6 +284,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn count_drops() {
         #[cfg(not(miri))]
         const COUNT: usize = 100_000;
@@ -314,6 +321,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn count_destroy() {
         #[cfg(not(miri))]
         const COUNT: usize = 100_000;
@@ -345,6 +353,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn drop_array() {
         const COUNT: usize = 700;
         static DROPS: AtomicUsize = AtomicUsize::new(0);
@@ -383,6 +392,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn destroy_array() {
         #[cfg(not(miri))]
         const COUNT: usize = 100_000;
@@ -421,6 +431,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
     fn stress() {
         const THREADS: usize = 8;
         #[cfg(not(miri))]
