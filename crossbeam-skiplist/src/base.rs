@@ -6,8 +6,8 @@ use core::cmp;
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
-use core::ops::{Bound, Index, RangeBounds};
-use core::ptr;
+use core::ops::{Bound, Deref, Index, RangeBounds};
+use core::ptr::{self, NonNull};
 use core::sync::atomic::{fence, AtomicUsize, Ordering};
 
 use crate::epoch::{self, Atomic, Collector, Guard, Shared};
@@ -31,12 +31,6 @@ struct Tower<K, V> {
     pointers: [Atomic<Node<K, V>>; 0],
 }
 
-impl<K, V> Tower<K, V> {
-    unsafe fn tower_ptr(tower: *const Tower<K, V>, level: usize) -> *const Atomic<Node<K, V>> {
-        (tower as *const Atomic<Node<K, V>>).add(level)
-    }
-}
-
 /// Tower at the head of a skip list.
 ///
 /// This is located in the `SkipList` struct itself and holds a full height
@@ -56,8 +50,14 @@ impl<K, V> Head<K, V> {
         }
     }
 
-    fn as_tower(&self) -> *const Tower<K, V> {
-        self.pointers.as_ptr() as *const Tower<K, V>
+    fn as_tower(&self) -> TowerRef<'_, K, V> {
+        unsafe {
+            let ptr = self.pointers.as_ptr();
+            TowerRef {
+                ptr: NonNull::new_unchecked(ptr as *mut Tower<K, V>),
+                _marker: PhantomData,
+            }
+        }
     }
 }
 
@@ -98,7 +98,7 @@ impl<K, V> Node<K, V> {
     /// The returned node will start with reference count of `ref_count` and the tower will be initialized
     /// with null pointers. However, the key and the value will be left uninitialized, and that is
     /// why this function is unsafe.
-    unsafe fn alloc(height: usize, ref_count: usize) -> *mut Self {
+    unsafe fn alloc(height: usize, ref_count: usize) -> NonNull<Self> {
         let layout = Self::get_layout(height);
         let ptr = alloc(layout) as *mut Self;
         if ptr.is_null() {
@@ -110,7 +110,7 @@ impl<K, V> Node<K, V> {
             AtomicUsize::new((height - 1) | ref_count << HEIGHT_BITS),
         );
         ptr::write_bytes((*ptr).tower.pointers.as_mut_ptr(), 0, height);
-        ptr
+        NonNull::new_unchecked(ptr)
     }
 
     /// Deallocates a node.
@@ -138,26 +138,19 @@ impl<K, V> Node<K, V> {
     fn height(&self) -> usize {
         (self.refs_and_height.load(Ordering::Relaxed) & HEIGHT_MASK) + 1
     }
+}
 
-    unsafe fn as_tower(node_ptr: *const Node<K, V>) -> *const Tower<K, V> {
-        &(*node_ptr).tower as *const Tower<K, V>
-    }
-
-    unsafe fn tower_ptr(node_ptr: *const Node<K, V>, level: usize) -> *const Atomic<Node<K, V>> {
-        let array_ptr = &(*node_ptr).tower.pointers.as_ptr();
-        array_ptr.add(level)
-    }
-
+impl<'a, K, V> NodeRef<'a, K, V> {
     /// Marks all pointers in the tower and returns `true` if the level 0 was not marked.
-    fn mark_tower(node_ptr: *const Node<K, V>) -> bool {
-        let height = unsafe { (*node_ptr).height() };
+    fn mark_tower(&self) -> bool {
+        let height = self.height();
 
         for level in (0..height).rev() {
             let tag = unsafe {
                 // We're loading the pointer only for the tag, so it's okay to use
                 // `epoch::unprotected()` in this situation.
                 // TODO(Amanieu): can we use release ordering here?
-                (*Node::tower_ptr(node_ptr, level))
+                self.tower(level)
                     .fetch_or(1, Ordering::SeqCst, epoch::unprotected())
                     .tag()
             };
@@ -174,17 +167,19 @@ impl<K, V> Node<K, V> {
 
     /// Returns `true` if the node is removed.
     #[inline]
-    fn is_removed(node_ptr: *const Node<K, V>) -> bool {
+    fn is_removed(&self) -> bool {
         let tag = unsafe {
             // We're loading the pointer only for the tag, so it's okay to use
             // `epoch::unprotected()` in this situation.
-            (*Node::tower_ptr(node_ptr, 0))
+            self.tower(0)
                 .load(Ordering::Relaxed, epoch::unprotected())
                 .tag()
         };
         tag == 1
     }
+}
 
+impl<K, V> Node<K, V> {
     /// Attempts to increment the reference count of a node and returns `true` on success.
     ///
     /// The reference count can be incremented only if it is non-zero.
@@ -283,6 +278,101 @@ where
     }
 }
 
+/// A pointer to a `Node`.
+///
+/// This includes convenience methods to access the tower of atomic pointers, which are in a
+/// flexible array member. It can be dereferenced to `&Node`, to access the normal members of the
+/// struct and additional methods.
+struct NodeRef<'a, K, V> {
+    ptr: NonNull<Node<K, V>>,
+    _marker: PhantomData<&'a Node<K, V>>,
+}
+
+impl<'a, K, V> Clone for NodeRef<'a, K, V> {
+    fn clone(&self) -> Self {
+        NodeRef {
+            ptr: self.ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, K, V> Copy for NodeRef<'a, K, V> {}
+
+impl<'a, K, V> NodeRef<'a, K, V> {
+    unsafe fn tower(&self, level: usize) -> &'a Atomic<Node<K, V>> {
+        let array_ptr = (*self.ptr.as_ptr()).tower.pointers.as_ptr();
+        &*array_ptr.add(level)
+    }
+
+    unsafe fn from_shared(shared: Shared<'a, Node<K, V>>) -> Option<NodeRef<'a, K, V>> {
+        let ptr = shared.as_raw();
+        if !ptr.is_null() {
+            Some(NodeRef {
+                ptr: NonNull::new_unchecked(ptr as *mut Node<K, V>),
+                _marker: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn as_tower<'r>(&'r self) -> TowerRef<'a, K, V> {
+        unsafe {
+            let ptr = (*self.ptr.as_ptr()).tower.pointers.as_mut_ptr();
+            TowerRef {
+                ptr: NonNull::new_unchecked(ptr as *mut Tower<K, V>),
+                _marker: PhantomData,
+            }
+        }
+    }
+
+    unsafe fn as_ptr(&self) -> *const Node<K, V> {
+        self.ptr.as_ptr()
+    }
+
+    unsafe fn from_ptr(ptr: NonNull<Node<K, V>>) -> NodeRef<'a, K, V> {
+        NodeRef {
+            ptr: ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, K, V> Deref for NodeRef<'a, K, V> {
+    type Target = Node<K, V>;
+    fn deref(&self) -> &Node<K, V> {
+        unsafe { &*self.ptr.as_ptr() }
+    }
+}
+
+/// A pointer to a tower of atomic pointers.
+///
+/// This could either point to the flexible array member inside of a `Node`, or to the pointers in
+/// the `Head` of a `SkipList`.
+struct TowerRef<'a, K, V> {
+    ptr: NonNull<Tower<K, V>>,
+    _marker: PhantomData<&'a Tower<K, V>>,
+}
+
+impl<'a, K, V> Clone for TowerRef<'a, K, V> {
+    fn clone(&self) -> Self {
+        TowerRef {
+            ptr: self.ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, K, V> Copy for TowerRef<'a, K, V> {}
+
+impl<'a, K, V> TowerRef<'a, K, V> {
+    unsafe fn tower(&self, level: usize) -> &'a Atomic<Node<K, V>> {
+        let array_ptr = (*self.ptr.as_ptr()).pointers.as_ptr();
+        &*array_ptr.add(level)
+    }
+}
+
 /// A search result.
 ///
 /// The result indicates whether the key was found, as well as what were the adjacent nodes to the
@@ -291,10 +381,10 @@ struct Position<'a, K, V> {
     /// Reference to a node with the given key, if found.
     ///
     /// If this is `Some` then it will point to the same node as `right[0]`.
-    found: Option<*const Node<K, V>>,
+    found: Option<NodeRef<'a, K, V>>,
 
     /// Adjacent nodes with smaller keys (predecessors).
-    left: [*const Tower<K, V>; MAX_HEIGHT],
+    left: [TowerRef<'a, K, V>; MAX_HEIGHT],
 
     /// Adjacent nodes with equal or greater keys (successors).
     right: [Shared<'a, Node<K, V>>; MAX_HEIGHT],
@@ -427,10 +517,8 @@ where
     {
         self.check_guard(guard);
         let n = self.search_bound(Bound::Included(key), false, guard)?;
-        unsafe {
-            if (*n).key.borrow() != key {
-                return None;
-            }
+        if n.key.borrow() != key {
+            return None;
         }
         Some(Entry {
             parent: self,
@@ -598,20 +686,20 @@ where
     unsafe fn help_unlink<'a>(
         &'a self,
         pred: &'a Atomic<Node<K, V>>,
-        curr: *const Node<K, V>,
+        curr: NodeRef<'a, K, V>,
         succ: Shared<'a, Node<K, V>>,
         guard: &'a Guard,
     ) -> Option<Shared<'a, Node<K, V>>> {
         // If `succ` is marked, that means `curr` is removed. Let's try
         // unlinking it from the skip list at this level.
         match pred.compare_and_set(
-            Shared::from(curr as *const _),
+            Shared::from(curr.as_ptr()),
             succ.with_tag(0),
             Ordering::Release,
             guard,
         ) {
             Ok(_) => {
-                (*curr).decrement(guard);
+                curr.decrement(guard);
                 Some(succ.with_tag(0))
             }
             Err(_) => None,
@@ -624,13 +712,13 @@ where
     /// node is reached then a search is performed using the given key.
     fn next_node<'a>(
         &'a self,
-        pred: *const Tower<K, V>,
+        pred: TowerRef<'a, K, V>,
         lower_bound: Bound<&K>,
         guard: &'a Guard,
-    ) -> Option<*const Node<K, V>> {
+    ) -> Option<NodeRef<'a, K, V>> {
         unsafe {
             // Load the level 0 successor of the current node.
-            let mut curr = (*Tower::tower_ptr(pred, 0)).load_consume(guard);
+            let mut curr = (pred.tower(0)).load_consume(guard);
 
             // If `curr` is marked, that means `pred` is removed and we have to use
             // a key search.
@@ -638,16 +726,11 @@ where
                 return self.search_bound(lower_bound, false, guard);
             }
 
-            loop {
-                let c = curr.as_raw();
-                if c.is_null() {
-                    break;
-                }
-
-                let succ = (*Node::tower_ptr(c, 0)).load_consume(guard);
+            while let Some(c) = NodeRef::from_shared(curr) {
+                let succ = (c.tower(0)).load_consume(guard);
 
                 if succ.tag() == 1 {
-                    if let Some(c) = self.help_unlink(&*Tower::tower_ptr(pred, 0), c, succ, guard) {
+                    if let Some(c) = self.help_unlink(pred.tower(0), c, succ, guard) {
                         // On success, continue searching through the current level.
                         curr = c;
                         continue;
@@ -678,7 +761,7 @@ where
         bound: Bound<&Q>,
         upper_bound: bool,
         guard: &'a Guard,
-    ) -> Option<*const Node<K, V>>
+    ) -> Option<NodeRef<'a, K, V>>
     where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
@@ -707,7 +790,7 @@ where
                     level -= 1;
 
                     // Two adjacent nodes at the current level.
-                    let mut curr = (*Tower::tower_ptr(pred, level)).load_consume(guard);
+                    let mut curr = pred.tower(level).load_consume(guard);
 
                     // If `curr` is marked, that means `pred` is removed and we have to restart the
                     // search.
@@ -717,16 +800,11 @@ where
 
                     // Iterate through the current level until we reach a node with a key greater
                     // than or equal to `key`.
-                    loop {
-                        let c = curr.as_raw();
-                        if c.is_null() {
-                            break;
-                        }
-
-                        let succ = (*Node::tower_ptr(c, level)).load_consume(guard);
+                    while let Some(c) = NodeRef::from_shared(curr) {
+                        let succ = c.tower(level).load_consume(guard);
 
                         if succ.tag() == 1 {
-                            if let Some(c) = self.help_unlink(&*Tower::tower_ptr(pred, level), c, succ, guard) {
+                            if let Some(c) = self.help_unlink(pred.tower(level), c, succ, guard) {
                                 // On success, continue searching through the current level.
                                 curr = c;
                                 continue;
@@ -744,17 +822,17 @@ where
                         // bound, we return the last node before the condition became true. For the
                         // lower bound, we return the first node after the condition became true.
                         if upper_bound {
-                            if !below_upper_bound(&bound, (*c).key.borrow()) {
+                            if !below_upper_bound(&bound, c.key.borrow()) {
                                 break;
                             }
                             result = Some(c);
-                        } else if above_lower_bound(&bound, (*c).key.borrow()) {
+                        } else if above_lower_bound(&bound, c.key.borrow()) {
                             result = Some(c);
                             break;
                         }
 
                         // Move one step forward.
-                        pred = Node::as_tower(c);
+                        pred = c.as_tower();
                         curr = succ;
                     }
                 }
@@ -798,7 +876,7 @@ where
                     level -= 1;
 
                     // Two adjacent nodes at the current level.
-                    let mut curr = (*Tower::tower_ptr(pred, level)).load_consume(guard);
+                    let mut curr = pred.tower(level).load_consume(guard);
 
                     // If `curr` is marked, that means `pred` is removed and we have to restart the
                     // search.
@@ -808,16 +886,11 @@ where
 
                     // Iterate through the current level until we reach a node with a key greater
                     // than or equal to `key`.
-                    loop {
-                        let c = curr.as_raw();
-                        if c.is_null() {
-                            break;
-                        }
-
-                        let succ = (*Node::tower_ptr(c, level)).load_consume(guard);
+                    while let Some(c) = NodeRef::from_shared(curr) {
+                        let succ = c.tower(level).load_consume(guard);
 
                         if succ.tag() == 1 {
-                            if let Some(c) = self.help_unlink(&*Tower::tower_ptr(pred, level), c, succ, guard) {
+                            if let Some(c) = self.help_unlink(pred.tower(level), c, succ, guard) {
                                 // On success, continue searching through the current level.
                                 curr = c;
                                 continue;
@@ -830,7 +903,7 @@ where
 
                         // If `curr` contains a key that is greater than or equal to `key`, we're
                         // done with this level.
-                        match (*c).key.borrow().cmp(key) {
+                        match c.key.borrow().cmp(key) {
                             cmp::Ordering::Greater => break,
                             cmp::Ordering::Equal => {
                                 result.found = Some(c);
@@ -840,7 +913,7 @@ where
                         }
 
                         // Move one step forward.
-                        pred = Node::as_tower(c);
+                        pred = c.as_tower();
                         curr = succ;
                     }
 
@@ -886,7 +959,7 @@ where
                 if replace {
                     // If a node with the key was found and we should replace it, mark its tower
                     // and then repeat the search.
-                    if Node::mark_tower(r) {
+                    if r.mark_tower() {
                         self.hot_data.len.fetch_sub(1, Ordering::Relaxed);
                     }
                 } else {
@@ -904,17 +977,17 @@ where
 
             // Create a new node.
             let height = self.random_height();
-            let (node, n, n_ptr) = {
+            let (node, n): (Shared<'_, Node<K, V>>, NodeRef<'_, K, V>) = {
                 // The reference count is initially two to account for:
                 // 1. The entry that will be returned.
                 // 2. The link at the level 0 of the tower.
-                let n = Node::<K, V>::alloc(height, 2);
+                let mut n = Node::<K, V>::alloc(height, 2);
 
                 // Write the key and the value into the node.
-                ptr::write(&mut (*n).key, key);
-                ptr::write(&mut (*n).value, value);
+                ptr::write(&mut (*n.as_mut()).key, key);
+                ptr::write(&mut (*n.as_mut()).value, value);
 
-                (Shared::<Node<K, V>>::from(n as *const _), &*n, n)
+                (Shared::from(n.as_ptr() as *const _), NodeRef::from_ptr(n))
             };
 
             // Optimistically increment `len`.
@@ -922,11 +995,12 @@ where
 
             loop {
                 // Set the lowest successor of `n` to `search.right[0]`.
-                (*Node::tower_ptr(n_ptr, 0)).store(search.right[0], Ordering::Relaxed);
+                n.tower(0).store(search.right[0], Ordering::Relaxed);
 
                 // Try installing the new node into the skip list (at level 0).
                 // TODO(Amanieu): can we use release ordering here?
-                if (*Tower::tower_ptr(search.left[0], 0))
+                if search.left[0]
+                    .tower(0)
                     .compare_and_set(search.right[0], node, Ordering::SeqCst, guard)
                     .is_ok()
                 {
@@ -947,7 +1021,7 @@ where
                     if replace {
                         // If a node with the key was found and we should replace it, mark its
                         // tower and then repeat the search.
-                        if Node::mark_tower(r) {
+                        if r.mark_tower() {
                             self.hot_data.len.fetch_sub(1, Ordering::Relaxed);
                         }
                     } else {
@@ -970,7 +1044,7 @@ where
             // The new node was successfully installed. Let's create an entry associated with it.
             let entry = RefEntry {
                 parent: self,
-                node: n_ptr,
+                node: n,
             };
 
             // Build the rest of the tower above level 0.
@@ -982,7 +1056,7 @@ where
 
                     // Load the current value of the pointer in the tower at this level.
                     // TODO(Amanieu): can we use relaxed ordering here?
-                    let next = (*Node::tower_ptr(n_ptr, level)).load(Ordering::SeqCst, guard);
+                    let next = n.tower(level).load(Ordering::SeqCst, guard);
 
                     // If the current pointer is marked, that means another thread is already
                     // removing the node we've just inserted. In that case, let's just stop
@@ -1018,7 +1092,7 @@ where
                     // operation fails, that means another thread has marked the pointer and we
                     // should stop building the tower.
                     // TODO(Amanieu): can we use release ordering here?
-                    if (*Node::tower_ptr(n_ptr, level))
+                    if n.tower(level)
                         .compare_and_set(next, succ, Ordering::SeqCst, guard)
                         .is_err()
                     {
@@ -1032,7 +1106,8 @@ where
 
                     // Try installing the new node at the current level.
                     // TODO(Amanieu): can we use release ordering here?
-                    if (*Tower::tower_ptr(pred, level))
+                    if pred
+                        .tower(level)
                         .compare_and_set(succ, node, Ordering::SeqCst, guard)
                         .is_ok()
                     {
@@ -1041,7 +1116,7 @@ where
                     }
 
                     // Installation failed. Decrement the reference count.
-                    (*n).refs_and_height
+                    n.refs_and_height
                         .fetch_sub(1 << HEIGHT_BITS, Ordering::Relaxed);
 
                     // We don't have the most up-to-date search results. Repeat the search.
@@ -1061,7 +1136,7 @@ where
             // installation, we must repeat the search, which will unlink the new node at that
             // level.
             // TODO(Amanieu): can we use relaxed ordering here?
-            if (*Node::tower_ptr(n_ptr, height - 1)).load(Ordering::SeqCst, guard).tag() == 1 {
+            if n.tower(height - 1).load(Ordering::SeqCst, guard).tag() == 1 {
                 self.search_bound(Bound::Included(&n.key), false, guard);
             }
 
@@ -1112,22 +1187,23 @@ where
                 };
 
                 // Try removing the node by marking its tower.
-                if Node::mark_tower(n) {
+                if n.mark_tower() {
                     // Success! Decrement `len`.
                     self.hot_data.len.fetch_sub(1, Ordering::Relaxed);
 
                     // Unlink the node at each level of the skip list. We could do this by simply
                     // repeating the search, but it's usually faster to unlink it manually using
                     // the `left` and `right` lists.
-                    for level in (0..(*n).height()).rev() {
+                    for level in (0..n.height()).rev() {
                         // TODO(Amanieu): can we use relaxed ordering here?
-                        let succ = (*Node::tower_ptr(n, level)).load(Ordering::SeqCst, guard).with_tag(0);
+                        let succ = n.tower(level).load(Ordering::SeqCst, guard).with_tag(0);
 
                         // Try linking the predecessor and successor at this level.
                         // TODO(Amanieu): can we use release ordering here?
-                        if (*Tower::tower_ptr(search.left[level], level))
+                        if search.left[level]
+                            .tower(level)
                             .compare_and_set(
-                                Shared::from(n as *const _),
+                                Shared::from(n.as_ptr()),
                                 succ,
                                 Ordering::SeqCst,
                                 guard,
@@ -1135,7 +1211,7 @@ where
                             .is_ok()
                         {
                             // Success! Decrement the reference count.
-                            (*n).decrement(guard);
+                            n.decrement(guard);
                         } else {
                             // Failed! Just repeat the search to completely unlink the node.
                             self.search_bound(Bound::Included(key), false, guard);
@@ -1203,7 +1279,7 @@ where
                     let next = e.next();
 
                     // Try removing the current entry.
-                    if Node::mark_tower(e.node) {
+                    if e.node.mark_tower() {
                         // Success! Decrement `len`.
                         self.hot_data.len.fetch_sub(1, Ordering::Relaxed);
                     }
@@ -1222,20 +1298,18 @@ where
 impl<K, V> Drop for SkipList<K, V> {
     fn drop(&mut self) {
         unsafe {
-            let mut node = self.head[0]
-                .load(Ordering::Relaxed, epoch::unprotected())
-                .as_raw();
+            let mut node =
+                NodeRef::from_shared(self.head[0].load(Ordering::Relaxed, epoch::unprotected()));
 
             // Iterate through the whole skip list and destroy every node.
-            while !node.is_null() {
+            while let Some(n) = node {
                 // Unprotected loads are okay because this function is the only one currently using
                 // the skip list.
-                let next = (*Node::tower_ptr(node, 0))
-                    .load(Ordering::Relaxed, epoch::unprotected())
-                    .as_raw();
+                let next =
+                    NodeRef::from_shared(n.tower(0).load(Ordering::Relaxed, epoch::unprotected()));
 
                 // Deallocate every node.
-                Node::finalize(node);
+                Node::finalize(n.as_ptr());
 
                 node = next;
             }
@@ -1286,24 +1360,24 @@ impl<K, V> IntoIterator for SkipList<K, V> {
 /// not outlive the `SkipList`.
 pub struct Entry<'a: 'g, 'g, K, V> {
     parent: &'a SkipList<K, V>,
-    node: *const Node<K, V>,
+    node: NodeRef<'g, K, V>,
     guard: &'g Guard,
 }
 
 impl<'a: 'g, 'g, K: 'a, V: 'a> Entry<'a, 'g, K, V> {
     /// Returns `true` if the entry is removed from the skip list.
     pub fn is_removed(&self) -> bool {
-        Node::is_removed(self.node)
+        self.node.is_removed()
     }
 
     /// Returns a reference to the key.
-    pub fn key(&self) -> &'g K {
-        unsafe { &(*self.node).key }
+    pub fn key<'e: 'g>(&'e self) -> &'g K {
+        &self.node.key
     }
 
     /// Returns a reference to the value.
-    pub fn value(&self) -> &'g V {
-        unsafe { &(*self.node).value }
+    pub fn value<'e: 'g>(&'e self) -> &'g V {
+        &self.node.value
     }
 
     /// Returns a reference to the parent `SkipList`
@@ -1331,15 +1405,13 @@ where
     /// Returns `true` if this call removed the entry and `false` if it was already removed.
     pub fn remove(&self) -> bool {
         // Try marking the tower.
-        if Node::mark_tower(self.node) {
+        if self.node.mark_tower() {
             // Success - the entry is removed. Now decrement `len`.
             self.parent.hot_data.len.fetch_sub(1, Ordering::Relaxed);
 
             // Search for the key to unlink the node from the skip list.
-            unsafe {
-                self.parent
-                    .search_bound(Bound::Included(&(*self.node).key), false, self.guard);
-            }
+            self.parent
+                .search_bound(Bound::Included(&self.node.key), false, self.guard);
 
             true
         } else {
@@ -1388,13 +1460,11 @@ where
 
     /// Returns the next entry in the skip list.
     pub fn next(&self) -> Option<Entry<'a, 'g, K, V>> {
-        let n = unsafe {
-            self.parent.next_node(
-                Node::as_tower(self.node),
-                Bound::Excluded(&(*self.node).key),
-                self.guard,
-            )?
-        };
+        let n = self.parent.next_node(
+            self.node.as_tower(),
+            Bound::Excluded(&self.node.key),
+            self.guard,
+        )?;
         Some(Entry {
             parent: self.parent,
             node: n,
@@ -1415,11 +1485,9 @@ where
 
     /// Returns the previous entry in the skip list.
     pub fn prev(&self) -> Option<Entry<'a, 'g, K, V>> {
-        let n = unsafe {
-            self
-                .parent
-                .search_bound(Bound::Excluded(&(*self.node).key), true, self.guard)?
-        };
+        let n = self
+            .parent
+            .search_bound(Bound::Excluded(&self.node.key), true, self.guard)?;
         Some(Entry {
             parent: self.parent,
             node: n,
@@ -1434,23 +1502,23 @@ where
 /// leaked. This is because releasing the entry requires a `Guard`.
 pub struct RefEntry<'a, K, V> {
     parent: &'a SkipList<K, V>,
-    node: *const Node<K, V>,
+    node: NodeRef<'a, K, V>,
 }
 
 impl<'a, K: 'a, V: 'a> RefEntry<'a, K, V> {
     /// Returns `true` if the entry is removed from the skip list.
     pub fn is_removed(&self) -> bool {
-        Node::is_removed(self.node)
+        self.node.is_removed()
     }
 
     /// Returns a reference to the key.
     pub fn key(&self) -> &K {
-        unsafe { &(*self.node).key }
+        &self.node.key
     }
 
     /// Returns a reference to the value.
     pub fn value(&self) -> &V {
-        unsafe { &(*self.node).value }
+        &self.node.value
     }
 
     /// Returns a reference to the parent `SkipList`
@@ -1461,7 +1529,7 @@ impl<'a, K: 'a, V: 'a> RefEntry<'a, K, V> {
     /// Releases the reference on the entry.
     pub fn release(self, guard: &Guard) {
         self.parent.check_guard(guard);
-        unsafe { (*self.node).decrement(guard) }
+        unsafe { self.node.decrement(guard) }
     }
 
     /// Releases the reference of the entry, pinning the thread only when
@@ -1470,22 +1538,22 @@ impl<'a, K: 'a, V: 'a> RefEntry<'a, K, V> {
     where
         F: FnOnce() -> Guard,
     {
-        unsafe { (*self.node).decrement_with_pin(self.parent, pin) }
+        unsafe { self.node.decrement_with_pin(self.parent, pin) }
     }
 
     /// Tries to create a new `RefEntry` by incrementing the reference count of
     /// a node.
-    unsafe fn try_acquire(
+    unsafe fn try_acquire<'n>(
         parent: &'a SkipList<K, V>,
-        node: *const Node<K, V>,
+        node: NodeRef<'n, K, V>,
     ) -> Option<RefEntry<'a, K, V>> {
-        if (*node).try_increment() {
+        if node.try_increment() {
             Some(RefEntry {
                 parent,
 
                 // We re-bind the lifetime of the node here to that of the skip
                 // list since we now hold a reference to it.
-                node: &*(node as *const _),
+                node: NodeRef::from_ptr(NonNull::new_unchecked(node.as_ptr() as *mut _)),
             })
         } else {
             None
@@ -1505,15 +1573,13 @@ where
         self.parent.check_guard(guard);
 
         // Try marking the tower.
-        if Node::mark_tower(self.node) {
+        if self.node.mark_tower() {
             // Success - the entry is removed. Now decrement `len`.
             self.parent.hot_data.len.fetch_sub(1, Ordering::Relaxed);
 
             // Search for the key to unlink the node from the skip list.
-            unsafe {
-                self.parent
-                    .search_bound(Bound::Included(&(*self.node).key), false, guard);
-            }
+            self.parent
+                .search_bound(Bound::Included(&self.node.key), false, guard);
 
             true
         } else {
@@ -1571,7 +1637,7 @@ where
             loop {
                 n = self
                     .parent
-                    .next_node(Node::as_tower(n), Bound::Excluded(&(*n).key), guard)?;
+                    .next_node(n.as_tower(), Bound::Excluded(&n.key), guard)?;
                 if let Some(e) = RefEntry::try_acquire(self.parent, n) {
                     return Some(e);
                 }
@@ -1597,7 +1663,7 @@ where
             loop {
                 n = self
                     .parent
-                    .search_bound(Bound::Excluded(&(*n).key), true, guard)?;
+                    .search_bound(Bound::Excluded(&n.key), true, guard)?;
                 if let Some(e) = RefEntry::try_acquire(self.parent, n) {
                     return Some(e);
                 }
@@ -1609,8 +1675,8 @@ where
 /// An iterator over the entries of a `SkipList`.
 pub struct Iter<'a: 'g, 'g, K, V> {
     parent: &'a SkipList<K, V>,
-    head: Option<*const Node<K, V>>,
-    tail: Option<*const Node<K, V>>,
+    head: Option<NodeRef<'g, K, V>>,
+    tail: Option<NodeRef<'g, K, V>>,
     guard: &'g Guard,
 }
 
@@ -1622,21 +1688,18 @@ where
 
     fn next(&mut self) -> Option<Entry<'a, 'g, K, V>> {
         self.head = match self.head {
-            Some(n) => unsafe {
-                self
-                    .parent
-                    .next_node(Node::as_tower(n), Bound::Excluded(&(*n).key), self.guard)
-            },
-            None => self
+            Some(n) => self
                 .parent
-                .next_node(self.parent.head.as_tower(), Bound::Unbounded, self.guard),
+                .next_node(n.as_tower(), Bound::Excluded(&n.key), self.guard),
+            None => {
+                self.parent
+                    .next_node(self.parent.head.as_tower(), Bound::Unbounded, self.guard)
+            }
         };
         if let (Some(h), Some(t)) = (self.head, self.tail) {
-            unsafe {
-                if (*h).key >= (*t).key {
-                    self.head = None;
-                    self.tail = None;
-                }
+            if h.key >= t.key {
+                self.head = None;
+                self.tail = None;
             }
         }
         self.head.map(|n| Entry {
@@ -1652,18 +1715,16 @@ where
     K: Ord,
 {
     fn next_back(&mut self) -> Option<Entry<'a, 'g, K, V>> {
-        unsafe {
-            self.tail = match self.tail {
-                Some(n) => self
-                    .parent
-                    .search_bound(Bound::Excluded(&(*n).key), true, self.guard),
-                None => self.parent.search_bound(Bound::Unbounded, true, self.guard),
-            };
-            if let (Some(h), Some(t)) = (self.head, self.tail) {
-                if (*h).key >= (*t).key {
-                    self.head = None;
-                    self.tail = None;
-                }
+        self.tail = match self.tail {
+            Some(n) => self
+                .parent
+                .search_bound(Bound::Excluded(&n.key), true, self.guard),
+            None => self.parent.search_bound(Bound::Unbounded, true, self.guard),
+        };
+        if let (Some(h), Some(t)) = (self.head, self.tail) {
+            if h.key >= t.key {
+                self.head = None;
+                self.tail = None;
             }
         }
         self.tail.map(|n| Entry {
@@ -1680,12 +1741,10 @@ where
     V: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe {
-            f.debug_struct("Iter")
-                .field("head", &self.head.map(|n| (&(*n).key, &(*n).value)))
-                .field("tail", &self.tail.map(|n| (&(*n).key, &(*n).value)))
-                .finish()
-        }
+        f.debug_struct("Iter")
+            .field("head", &self.head.as_ref().map(|n| (&n.key, &n.value)))
+            .field("tail", &self.tail.as_ref().map(|n| (&n.key, &n.value)))
+            .finish()
     }
 }
 
@@ -1726,7 +1785,7 @@ where
             Some(ref e) => {
                 let next_head = e.next(guard);
                 unsafe {
-                    (*e.node).decrement(guard);
+                    e.node.decrement(guard);
                 }
                 next_head
             }
@@ -1752,7 +1811,7 @@ where
             Some(ref e) => {
                 let next_tail = e.prev(guard);
                 unsafe {
-                    (*e.node).decrement(guard);
+                    e.node.decrement(guard);
                 }
                 next_tail
             }
@@ -1780,8 +1839,8 @@ where
     Q: Ord + ?Sized,
 {
     parent: &'a SkipList<K, V>,
-    head: Option<*const Node<K, V>>,
-    tail: Option<*const Node<K, V>>,
+    head: Option<NodeRef<'g, K, V>>,
+    tail: Option<NodeRef<'g, K, V>>,
     range: R,
     guard: &'g Guard,
     _marker: PhantomData<fn() -> Q>, // covariant over `Q`
@@ -1796,24 +1855,22 @@ where
     type Item = Entry<'a, 'g, K, V>;
 
     fn next(&mut self) -> Option<Entry<'a, 'g, K, V>> {
-        unsafe {
-            self.head = match self.head {
-                Some(n) => self
-                    .parent
-                    .next_node(Node::as_tower(n), Bound::Excluded(&(*n).key), self.guard),
-                None => self
-                    .parent
-                    .search_bound(self.range.start_bound(), false, self.guard),
+        self.head = match self.head {
+            Some(n) => self
+                .parent
+                .next_node(n.as_tower(), Bound::Excluded(&n.key), self.guard),
+            None => self
+                .parent
+                .search_bound(self.range.start_bound(), false, self.guard),
+        };
+        if let Some(h) = self.head {
+            let bound = match self.tail.as_ref() {
+                Some(t) => Bound::Excluded(t.key.borrow()),
+                None => self.range.end_bound(),
             };
-            if let Some(h) = self.head {
-                let bound = match self.tail {
-                    Some(t) => Bound::Excluded((*t).key.borrow()),
-                    None => self.range.end_bound(),
-                };
-                if !below_upper_bound(&bound, (*h).key.borrow()) {
-                    self.head = None;
-                    self.tail = None;
-                }
+            if !below_upper_bound(&bound, h.key.borrow()) {
+                self.head = None;
+                self.tail = None;
             }
         }
         self.head.map(|n| Entry {
@@ -1831,24 +1888,22 @@ where
     Q: Ord + ?Sized,
 {
     fn next_back(&mut self) -> Option<Entry<'a, 'g, K, V>> {
-        unsafe {
-            self.tail = match self.tail {
-                Some(n) => self
-                    .parent
-                    .search_bound(Bound::Excluded(&(*n).key.borrow()), true, self.guard),
-                None => self
-                    .parent
-                    .search_bound(self.range.end_bound(), true, self.guard),
+        self.tail = match self.tail {
+            Some(n) => self
+                .parent
+                .search_bound(Bound::Excluded(&n.key.borrow()), true, self.guard),
+            None => self
+                .parent
+                .search_bound(self.range.end_bound(), true, self.guard),
+        };
+        if let Some(t) = self.tail {
+            let bound = match self.head.as_ref() {
+                Some(h) => Bound::Excluded(h.key.borrow()),
+                None => self.range.start_bound(),
             };
-            if let Some(t) = self.tail {
-                let bound = match self.head {
-                    Some(h) => Bound::Excluded((*h).key.borrow()),
-                    None => self.range.start_bound(),
-                };
-                if !above_lower_bound(&bound, (*t).key.borrow()) {
-                    self.head = None;
-                    self.tail = None;
-                }
+            if !above_lower_bound(&bound, t.key.borrow()) {
+                self.head = None;
+                self.tail = None;
             }
         }
         self.tail.map(|n| Entry {
@@ -1869,8 +1924,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Range")
             .field("range", &self.range)
-            .field("head", &self.head)
-            .field("tail", &self.tail)
+            .field("head", &self.head.as_ref().map(|node_ref| node_ref.deref()))
+            .field("tail", &self.tail.as_ref().map(|node_ref| node_ref.deref()))
             .finish()
     }
 }
@@ -1980,8 +2035,15 @@ where
 pub struct IntoIter<K, V> {
     /// The current node.
     ///
-    /// All preceeding nods have already been destroyed.
+    /// All preceeding nodes have already been destroyed.
     node: *mut Node<K, V>,
+}
+
+impl<K, V> IntoIter<K, V> {
+    unsafe fn load_next<'a>(&'a self) -> Shared<'a, Node<K, V>> {
+        // Unprotected loads are okay because this iterator is the only thing using the skip list.
+        (*(*self.node).tower.pointers.as_ptr()).load(Ordering::Relaxed, epoch::unprotected())
+    }
 }
 
 impl<K, V> Drop for IntoIter<K, V> {
@@ -1989,9 +2051,7 @@ impl<K, V> Drop for IntoIter<K, V> {
         // Iterate through the whole chain and destroy every node.
         while !self.node.is_null() {
             unsafe {
-                // Unprotected loads are okay because this function is the only one currently using
-                // the skip list.
-                let next = (*Node::tower_ptr(self.node, 0)).load(Ordering::Relaxed, epoch::unprotected());
+                let next = self.load_next();
 
                 // We can safely do this without defering because references to
                 // keys & values that we give out never outlive the SkipList.
@@ -2019,10 +2079,8 @@ impl<K, V> Iterator for IntoIter<K, V> {
                 let value = ptr::read(&(*self.node).value);
 
                 // Get the next node in the skip list.
-                //
-                // Unprotected loads are okay because this function is the only one currently using
-                // the skip list.
-                let next = (*Node::tower_ptr(self.node, 0)).load(Ordering::Relaxed, epoch::unprotected());
+                let next = self.load_next();
+                let next_tag = next.tag();
 
                 // Deallocate the current node and move to the next one.
                 Node::dealloc(self.node);
@@ -2030,7 +2088,7 @@ impl<K, V> Iterator for IntoIter<K, V> {
 
                 // The current node may be marked. If it is, it's been removed from the skip list
                 // and we should just skip it.
-                if next.tag() == 0 {
+                if next_tag == 0 {
                     return Some((key, value));
                 }
             }
