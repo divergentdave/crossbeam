@@ -11,25 +11,24 @@ fn new() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn is_empty() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
     assert!(s.is_empty());
 
-    s.insert(1, 10, guard);
+    s.insert(1, 10, guard).release(guard);
     assert!(!s.is_empty());
-    s.insert(2, 20, guard);
-    s.insert(3, 30, guard);
-    assert!(!s.is_empty());
-
-    s.remove(&2, guard);
+    s.insert(2, 20, guard).release(guard);
+    s.insert(3, 30, guard).release(guard);
     assert!(!s.is_empty());
 
-    s.remove(&1, guard);
+    s.remove(&2, guard).map(|entry| entry.release(guard));
     assert!(!s.is_empty());
 
-    s.remove(&3, guard);
+    s.remove(&1, guard).map(|entry| entry.release(guard));
+    assert!(!s.is_empty());
+
+    s.remove(&3, guard).map(|entry| entry.release(guard));
     assert!(s.is_empty());
 }
 
@@ -51,7 +50,6 @@ fn insert() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn remove() {
     let guard = &epoch::pin();
     let insert = [0, 4, 2, 12, 8, 7, 11, 5];
@@ -62,13 +60,15 @@ fn remove() {
     let s = SkipList::new(epoch::default_collector().clone());
 
     for &x in &insert {
-        s.insert(x, x * 10, guard);
+        s.insert(x, x * 10, guard).release(guard);
     }
     for x in &not_present {
         assert!(s.remove(x, guard).is_none());
     }
     for x in &remove {
-        assert!(s.remove(x, guard).is_some());
+        let removed = s.remove(x, guard);
+        assert!(removed.is_some());
+        removed.unwrap().release(guard);
     }
 
     let mut v = vec![];
@@ -82,7 +82,7 @@ fn remove() {
 
     assert_eq!(v, remaining);
     for x in &insert {
-        s.remove(x, guard);
+        s.remove(x, guard).map(|entry| entry.release(guard));
     }
     assert!(s.is_empty());
 }
@@ -113,13 +113,12 @@ fn entry() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn entry_remove() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
 
     for &x in &[4, 2, 12, 8, 7, 11, 5] {
-        s.insert(x, x * 10, guard);
+        s.insert(x, x * 10, guard).release(guard);
     }
 
     let mut e = s.get(&7, guard).unwrap();
@@ -141,13 +140,12 @@ fn entry_remove() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn entry_reposition() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
 
     for &x in &[4, 2, 12, 8, 7, 11, 5] {
-        s.insert(x, x * 10, guard);
+        s.insert(x, x * 10, guard).release(guard);
     }
 
     let mut e = s.get(&7, guard).unwrap();
@@ -155,56 +153,60 @@ fn entry_reposition() {
     assert!(e.remove());
     assert!(e.is_removed());
 
-    s.insert(7, 700, guard);
+    s.insert(7, 700, guard).release(guard);
     e.move_prev();
     e.move_next();
     assert_eq!(*e.key(), 7);
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn len() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
     assert_eq!(s.len(), 0);
 
     for (i, &x) in [4, 2, 12, 8, 7, 11, 5].iter().enumerate() {
-        s.insert(x, x * 1, guard);
+        s.insert(x, x * 1, guard).release(guard);
         assert_eq!(s.len(), i + 1);
     }
 
-    s.insert(5, 0, guard);
+    s.insert(5, 0, guard).release(guard);
     assert_eq!(s.len(), 7);
-    s.insert(5, 0, guard);
+    s.insert(5, 0, guard).release(guard);
     assert_eq!(s.len(), 7);
 
-    s.remove(&6, guard);
+    s.remove(&6, guard).map(|entry| entry.release(guard));
     assert_eq!(s.len(), 7);
-    s.remove(&5, guard);
+    s.remove(&5, guard).map(|entry| entry.release(guard));
     assert_eq!(s.len(), 6);
-    s.remove(&12, guard);
+    s.remove(&12, guard).map(|entry| entry.release(guard));
     assert_eq!(s.len(), 5);
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn insert_and_remove() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
     let keys = || s.iter(guard).map(|e| *e.key()).collect::<Vec<_>>();
 
-    s.insert(3, 0, guard);
-    s.insert(5, 0, guard);
-    s.insert(1, 0, guard);
-    s.insert(4, 0, guard);
-    s.insert(2, 0, guard);
+    s.insert(3, 0, guard).release(guard);
+    s.insert(5, 0, guard).release(guard);
+    s.insert(1, 0, guard).release(guard);
+    s.insert(4, 0, guard).release(guard);
+    s.insert(2, 0, guard).release(guard);
     assert_eq!(keys(), [1, 2, 3, 4, 5]);
 
-    assert!(s.remove(&4, guard).is_some());
+    let removed = s.remove(&4, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), [1, 2, 3, 5]);
-    assert!(s.remove(&3, guard).is_some());
+    let removed = s.remove(&3, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), [1, 2, 5]);
-    assert!(s.remove(&1, guard).is_some());
+    let removed = s.remove(&1, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), [2, 5]);
 
     assert!(s.remove(&1, guard).is_none());
@@ -212,27 +214,37 @@ fn insert_and_remove() {
     assert!(s.remove(&3, guard).is_none());
     assert_eq!(keys(), [2, 5]);
 
-    assert!(s.remove(&2, guard).is_some());
+    let removed = s.remove(&2, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), [5]);
-    assert!(s.remove(&5, guard).is_some());
+    let removed = s.remove(&5, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), []);
 
-    s.insert(3, 0, guard);
+    s.insert(3, 0, guard).release(guard);
     assert_eq!(keys(), [3]);
-    s.insert(1, 0, guard);
+    s.insert(1, 0, guard).release(guard);
     assert_eq!(keys(), [1, 3]);
-    s.insert(3, 0, guard);
+    s.insert(3, 0, guard).release(guard);
     assert_eq!(keys(), [1, 3]);
-    s.insert(5, 0, guard);
+    s.insert(5, 0, guard).release(guard);
     assert_eq!(keys(), [1, 3, 5]);
 
-    assert!(s.remove(&3, guard).is_some());
+    let removed = s.remove(&3, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), [1, 5]);
-    assert!(s.remove(&1, guard).is_some());
+    let removed = s.remove(&1, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), [5]);
     assert!(s.remove(&3, guard).is_none());
     assert_eq!(keys(), [5]);
-    assert!(s.remove(&5, guard).is_some());
+    let removed = s.remove(&5, guard);
+    assert!(removed.is_some());
+    removed.unwrap().release(guard);
     assert_eq!(keys(), []);
 }
 
@@ -419,23 +431,28 @@ fn upper_bound() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn get_or_insert() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
-    s.insert(3, 3, guard);
-    s.insert(5, 5, guard);
-    s.insert(1, 1, guard);
-    s.insert(4, 4, guard);
-    s.insert(2, 2, guard);
+    s.insert(3, 3, guard).release(guard);
+    s.insert(5, 5, guard).release(guard);
+    s.insert(1, 1, guard).release(guard);
+    s.insert(4, 4, guard).release(guard);
+    s.insert(2, 2, guard).release(guard);
 
     assert_eq!(*s.get(&4, guard).unwrap().value(), 4);
-    assert_eq!(*s.insert(4, 40, guard).value(), 40);
+    let entry = s.insert(4, 40, guard);
+    assert_eq!(*entry.value(), 40);
+    entry.release(guard);
     assert_eq!(*s.get(&4, guard).unwrap().value(), 40);
 
-    assert_eq!(*s.get_or_insert(4, 400, guard).value(), 40);
+    let entry = s.get_or_insert(4, 400, guard);
+    assert_eq!(*entry.value(), 40);
+    entry.release(guard);
     assert_eq!(*s.get(&4, guard).unwrap().value(), 40);
-    assert_eq!(*s.get_or_insert(6, 600, guard).value(), 600);
+    let entry = s.get_or_insert(6, 600, guard);
+    assert_eq!(*entry.value(), 600);
+    entry.release(guard);
 }
 
 #[test]
@@ -488,12 +505,11 @@ fn front_and_back() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "the evaluated program leaked memory")]
 fn iter() {
     let guard = &epoch::pin();
     let s = SkipList::new(epoch::default_collector().clone());
     for &x in &[4, 2, 12, 8, 7, 11, 5] {
-        s.insert(x, x * 10, guard);
+        s.insert(x, x * 10, guard).release(guard);
     }
 
     assert_eq!(
@@ -502,13 +518,13 @@ fn iter() {
     );
 
     let mut it = s.iter(guard);
-    s.remove(&2, guard);
+    s.remove(&2, guard).map(|entry| entry.release(guard));
     assert_eq!(*it.next().unwrap().key(), 4);
-    s.remove(&7, guard);
+    s.remove(&7, guard).map(|entry| entry.release(guard));
     assert_eq!(*it.next().unwrap().key(), 5);
-    s.remove(&5, guard);
+    s.remove(&5, guard).map(|entry| entry.release(guard));
     assert_eq!(*it.next().unwrap().key(), 8);
-    s.remove(&12, guard);
+    s.remove(&12, guard).map(|entry| entry.release(guard));
     assert_eq!(*it.next().unwrap().key(), 11);
     assert!(it.next().is_none());
 }
