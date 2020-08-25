@@ -13,7 +13,7 @@ fn ms(ms: u64) -> Duration {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn fire() {
     let start = Instant::now();
     let r = tick(ms(50));
@@ -43,7 +43,7 @@ fn fire() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn intervals() {
     let start = Instant::now();
     let r = tick(ms(50));
@@ -66,7 +66,6 @@ fn intervals() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn capacity() {
     const COUNT: usize = 10;
 
@@ -77,7 +76,7 @@ fn capacity() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn len_empty_full() {
     let r = tick(ms(50));
 
@@ -99,7 +98,7 @@ fn len_empty_full() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn try_recv() {
     let r = tick(ms(200));
     assert!(r.try_recv().is_err());
@@ -117,7 +116,7 @@ fn try_recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv() {
     let start = Instant::now();
     let r = tick(ms(50));
@@ -134,7 +133,7 @@ fn recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_timeout() {
     let start = Instant::now();
     let r = tick(ms(200));
@@ -159,7 +158,6 @@ fn recv_timeout() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn recv_two() {
     let r1 = tick(ms(50));
     let r2 = tick(ms(50));
@@ -186,21 +184,23 @@ fn recv_two() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn recv_race() {
+    #[cfg(not(miri))]
+    const TIMEOUT_MULTIPLIER: u64 = 1;
+    #[cfg(miri)]
+    const TIMEOUT_MULTIPLIER: u64 = 10;
     select! {
-        recv(tick(ms(50))) -> _ => {}
-        recv(tick(ms(100))) -> _ => panic!(),
+        recv(tick(ms(50 * TIMEOUT_MULTIPLIER))) -> _ => {}
+        recv(tick(ms(100 * TIMEOUT_MULTIPLIER))) -> _ => panic!(),
     }
 
     select! {
-        recv(tick(ms(100))) -> _ => panic!(),
-        recv(tick(ms(50))) -> _ => {}
+        recv(tick(ms(100 * TIMEOUT_MULTIPLIER))) -> _ => panic!(),
+        recv(tick(ms(50 * TIMEOUT_MULTIPLIER))) -> _ => {}
     }
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn stress_default() {
     const COUNT: usize = 10;
 
@@ -220,18 +220,21 @@ fn stress_default() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn select() {
     const THREADS: usize = 4;
+    #[cfg(not(miri))]
+    const TIMEOUT_MULTIPLIER: u64 = 1;
+    #[cfg(miri)]
+    const TIMEOUT_MULTIPLIER: u64 = 10;
 
     let hits = AtomicUsize::new(0);
-    let r1 = tick(ms(200));
-    let r2 = tick(ms(300));
+    let r1 = tick(ms(200 * TIMEOUT_MULTIPLIER));
+    let r2 = tick(ms(300 * TIMEOUT_MULTIPLIER));
 
     scope(|scope| {
         for _ in 0..THREADS {
             scope.spawn(|_| {
-                let timeout = after(ms(1100));
+                let timeout = after(ms(1100 * TIMEOUT_MULTIPLIER));
                 loop {
                     let mut sel = Select::new();
                     let oper1 = sel.recv(&r1);
@@ -263,18 +266,21 @@ fn select() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn ready() {
     const THREADS: usize = 4;
+    #[cfg(not(miri))]
+    const TIMEOUT_MULTIPLIER: u64 = 1;
+    #[cfg(miri)]
+    const TIMEOUT_MULTIPLIER: u64 = 25;
 
     let hits = AtomicUsize::new(0);
-    let r1 = tick(ms(200));
-    let r2 = tick(ms(300));
+    let r1 = tick(ms(200 * TIMEOUT_MULTIPLIER));
+    let r2 = tick(ms(300 * TIMEOUT_MULTIPLIER));
 
     scope(|scope| {
         for _ in 0..THREADS {
             scope.spawn(|_| {
-                let timeout = after(ms(1100));
+                let timeout = after(ms(1100 * TIMEOUT_MULTIPLIER));
                 'outer: loop {
                     let mut sel = Select::new();
                     sel.recv(&r1);
@@ -312,7 +318,6 @@ fn ready() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness() {
     const COUNT: usize = 30;
 
@@ -336,7 +341,6 @@ fn fairness() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness_duplicates() {
     const COUNT: usize = 30;
 

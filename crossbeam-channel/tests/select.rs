@@ -260,7 +260,6 @@ fn timeout() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn default_when_disconnected() {
     let (_, r) = unbounded::<i32>();
 
@@ -316,7 +315,7 @@ fn default_when_disconnected() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn default_only() {
     let start = Instant::now();
 
@@ -875,7 +874,6 @@ fn stress_timeout_two_threads() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn send_recv_same_channel() {
     let (s, r) = bounded::<i32>(0);
     let mut sel = Select::new();
@@ -1073,7 +1071,6 @@ fn linearizable_try() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn linearizable_timeout() {
     #[cfg(not(miri))]
     const COUNT: usize = 100_000;
@@ -1129,7 +1126,6 @@ fn linearizable_timeout() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness1() {
     #[cfg(not(miri))]
     const COUNT: usize = 10_000;

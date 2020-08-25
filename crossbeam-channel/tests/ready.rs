@@ -56,7 +56,7 @@ fn smoke2() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn disconnected() {
     let (s1, r1) = unbounded::<i32>();
     let (s2, r2) = unbounded::<i32>();
@@ -142,7 +142,7 @@ fn default() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn timeout() {
     let (_s1, r1) = unbounded::<i32>();
     let (s2, r2) = unbounded::<i32>();
@@ -190,7 +190,6 @@ fn timeout() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn default_when_disconnected() {
     let (_, r) = unbounded::<i32>();
 
@@ -230,7 +229,7 @@ fn default_when_disconnected() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn default_only() {
     let start = Instant::now();
 
@@ -665,7 +664,6 @@ fn stress_timeout_two_threads() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn send_recv_same_channel() {
     let (s, r) = bounded::<i32>(0);
     let mut sel = Select::new();
@@ -741,7 +739,6 @@ fn channel_through_channel() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn fairness1() {
     #[cfg(not(miri))]
     const COUNT: usize = 10_000;

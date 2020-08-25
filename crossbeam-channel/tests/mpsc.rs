@@ -654,7 +654,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn oneshot_single_thread_recv_timeout() {
         let (tx, rx) = channel();
         tx.send(()).unwrap();
@@ -668,7 +667,7 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
+    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn stress_recv_timeout_two_threads() {
         let (tx, rx) = channel();
         let stress = stress_factor() + 100;
@@ -700,7 +699,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn recv_timeout_upgrade() {
         let (tx, rx) = channel::<()>();
         let timeout = Duration::from_millis(1);
@@ -712,7 +710,7 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
+    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn stress_recv_timeout_shared() {
         let (tx, rx) = channel();
         let stress = stress_factor() + 100;
@@ -766,7 +764,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn shared_recv_timeout() {
         let (tx, rx) = channel();
         let total = 5;
@@ -1015,7 +1012,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn recv_timeout() {
         let (tx, rx) = sync_channel::<i32>(1);
         assert_eq!(
@@ -1119,7 +1115,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_two_threads() {
         #[cfg(not(miri))]
         const AMT: i32 = 10_000;
@@ -1151,7 +1146,6 @@ mod sync_channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn stress_recv_timeout_shared() {
         #[cfg(not(miri))]
         const AMT: u32 = 1000;

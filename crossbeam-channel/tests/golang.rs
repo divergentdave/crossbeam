@@ -411,7 +411,6 @@ mod nonblock {
     const MAX_TRIES: usize = 10000; // Up to 100ms per test.
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::clock_gettime")]
     fn main() {
         let mut ts = Vec::with_capacity(16);
         let ticker = tick(Duration::new(0, 10_000)); // 10 us

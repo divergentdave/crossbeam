@@ -17,7 +17,6 @@ fn ms(ms: u64) -> Duration {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn smoke() {
     let (s, r) = bounded(1);
     s.send(7).unwrap();
@@ -124,7 +123,7 @@ fn recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_timeout() {
     let (s, r) = bounded::<i32>(100);
 
@@ -195,7 +194,7 @@ fn send() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
+#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn send_timeout() {
     let (s, r) = bounded(2);
 
@@ -224,7 +223,6 @@ fn send_timeout() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::clock_gettime")]
 fn send_after_disconnect() {
     let (s, r) = bounded(100);
 
