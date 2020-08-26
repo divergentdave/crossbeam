@@ -56,7 +56,6 @@ fn smoke2() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn disconnected() {
     let (s1, r1) = unbounded::<i32>();
     let (s2, r2) = unbounded::<i32>();
@@ -142,7 +141,6 @@ fn default() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn timeout() {
     let (_s1, r1) = unbounded::<i32>();
     let (s2, r2) = unbounded::<i32>();
@@ -229,7 +227,6 @@ fn default_when_disconnected() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn default_only() {
     let start = Instant::now();
 
@@ -247,7 +244,6 @@ fn default_only() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn unblocks() {
     let (s1, r1) = bounded::<i32>(0);
     let (s2, r2) = bounded::<i32>(0);
@@ -291,7 +287,6 @@ fn unblocks() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn both_ready() {
     let (s1, r1) = bounded(0);
     let (s2, r2) = bounded(0);
@@ -349,7 +344,6 @@ fn cloning1() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn cloning2() {
     let (s1, r1) = unbounded::<()>();
     let (s2, r2) = unbounded::<()>();
@@ -609,7 +603,6 @@ fn stress_mixed() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn stress_timeout_two_threads() {
     const COUNT: usize = 20;
 

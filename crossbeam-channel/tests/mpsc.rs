@@ -667,7 +667,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn stress_recv_timeout_two_threads() {
         let (tx, rx) = channel();
         let stress = stress_factor() + 100;
@@ -710,7 +709,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn stress_recv_timeout_shared() {
         let (tx, rx) = channel();
         let stress = stress_factor() + 100;

@@ -64,7 +64,6 @@ fn counter_builder() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn counter_panic() {
     let counter = AtomicUsize::new(0);
     let result = thread::scope(|scope| {
@@ -85,7 +84,6 @@ fn counter_panic() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn panic_twice() {
     let result = thread::scope(|scope| {
         scope.spawn(|_| {
@@ -166,7 +164,6 @@ fn nesting() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn join_nested() {
     thread::scope(|scope| {
         scope.spawn(|scope| {
@@ -189,7 +186,6 @@ fn scope_returns_ok() {
 
 #[cfg(unix)]
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn as_pthread_t() {
     use std::os::unix::thread::JoinHandleExt;
     thread::scope(|scope| {

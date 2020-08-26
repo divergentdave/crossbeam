@@ -12,7 +12,6 @@ fn ms(ms: u64) -> Duration {
 
 #[test]
 #[cfg_attr(target_os = "macos", ignore = "TLS is destroyed too early on macOS")]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn use_while_exiting() {
     struct Foo;
 

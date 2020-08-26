@@ -13,7 +13,6 @@ fn ms(ms: u64) -> Duration {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn fire() {
     let start = Instant::now();
     let r = after(ms(50));
@@ -53,7 +52,6 @@ fn capacity() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn len_empty_full() {
     let r = after(ms(50));
 
@@ -75,7 +73,6 @@ fn len_empty_full() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn try_recv() {
     let r = after(ms(200));
     assert!(r.try_recv().is_err());
@@ -92,7 +89,6 @@ fn try_recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv() {
     let start = Instant::now();
     let r = after(ms(50));
@@ -109,7 +105,6 @@ fn recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_timeout() {
     let start = Instant::now();
     let r = after(ms(200));

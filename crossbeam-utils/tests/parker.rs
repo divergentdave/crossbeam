@@ -23,7 +23,6 @@ fn park_timeout_unpark_not_called() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn park_timeout_unpark_called_other_thread() {
     for _ in 0..10 {
         let p = Parker::new();

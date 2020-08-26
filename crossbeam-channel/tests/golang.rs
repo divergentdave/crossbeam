@@ -882,9 +882,11 @@ mod chan_test {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn test_chan() {
+        #[cfg(not(miri))]
         const N: i32 = 200;
+        #[cfg(miri)]
+        const N: i32 = 20;
 
         for cap in 0..N {
             {
@@ -1477,7 +1479,6 @@ mod chan_test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "libc::nanosleep")]
     fn test_select_duplicate_channel() {
         // This test makes sure we can queue a G on
         // the same channel multiple times.

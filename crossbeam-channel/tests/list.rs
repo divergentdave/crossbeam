@@ -67,7 +67,6 @@ fn len_empty_full() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn try_recv() {
     let (s, r) = unbounded();
 
@@ -88,7 +87,6 @@ fn try_recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv() {
     let (s, r) = unbounded();
 
@@ -112,7 +110,6 @@ fn recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_timeout() {
     let (s, r) = unbounded::<i32>();
 
@@ -225,7 +222,6 @@ fn len() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn disconnect_wakes_receiver() {
     let (s, r) = unbounded::<()>();
 
@@ -356,7 +352,6 @@ fn stress_iter() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn stress_timeout_two_threads() {
     const COUNT: usize = 100;
 

@@ -37,7 +37,6 @@ fn optional() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn tick_n() {
     let mut r = tick(ms(100));
     let mut step = 0;
@@ -71,7 +70,6 @@ fn len_empty_full() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn try_recv() {
     let r = never::<i32>();
     assert!(r.try_recv().is_err());
@@ -81,7 +79,6 @@ fn try_recv() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "libc::nanosleep")]
 fn recv_timeout() {
     let start = Instant::now();
     let r = never::<i32>();
