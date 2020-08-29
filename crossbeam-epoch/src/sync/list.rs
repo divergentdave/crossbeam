@@ -23,7 +23,7 @@ pub struct Entry {
     /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
     /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
     /// static variables.)
-    miri_leak_tracking_next: core::cell::RefCell<*const Entry>,
+    miri_leak_tracking_next: core::cell::UnsafeCell<*const Entry>,
 }
 
 #[cfg(miri)]
@@ -113,7 +113,7 @@ pub struct List<T, C: IsElement<T> = T> {
     /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
     /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
     /// static variables.)
-    miri_leak_tracking_head: core::cell::RefCell<*const Entry>,
+    miri_leak_tracking_head: core::cell::UnsafeCell<*const Entry>,
 
     /// The phantom data for using `T` and `C`.
     _marker: PhantomData<(T, C)>,
@@ -155,7 +155,7 @@ impl Default for Entry {
         Self {
             next: Atomic::null(),
             #[cfg(miri)]
-            miri_leak_tracking_next: core::cell::RefCell::new(core::ptr::null()),
+            miri_leak_tracking_next: core::cell::UnsafeCell::new(core::ptr::null()),
         }
     }
 }
@@ -179,7 +179,7 @@ impl<T, C: IsElement<T>> List<T, C> {
         Self {
             head: Atomic::null(),
             #[cfg(miri)]
-            miri_leak_tracking_head: core::cell::RefCell::new(core::ptr::null()),
+            miri_leak_tracking_head: core::cell::UnsafeCell::new(core::ptr::null()),
             _marker: PhantomData,
         }
     }
@@ -213,7 +213,8 @@ impl<T, C: IsElement<T>> List<T, C> {
                 // Mirror the change to the next pointer to assist in identifying memory leaks.
                 // Round trip Shared => reference => *const in order to force int-to-pointer
                 // conversion in Miri.
-                entry.miri_leak_tracking_next.replace(
+                std::ptr::write(
+                    entry.miri_leak_tracking_next.get(),
                     next.as_ref()
                         .map(|r| r as *const Entry)
                         .unwrap_or_else(core::ptr::null),
@@ -227,7 +228,8 @@ impl<T, C: IsElement<T>> List<T, C> {
                         // in the raw pointer field, to assist in identifying memory leaks.
                         // Round trip Shared => reference => *const in order to force
                         // int-to-pointer conversion in Miri.
-                        self.miri_leak_tracking_head.replace(
+                        std::ptr::write(
+                            self.miri_leak_tracking_head.get(),
                             entry_ptr
                                 .as_ref()
                                 .map(|r| r as *const Entry)

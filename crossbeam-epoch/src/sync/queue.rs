@@ -28,7 +28,7 @@ pub struct Queue<T> {
     /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
     /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
     /// static variables.)
-    miri_leak_tracking_head: core::cell::RefCell<*const Node<T>>,
+    miri_leak_tracking_head: core::cell::UnsafeCell<*const Node<T>>,
 }
 
 struct Node<T> {
@@ -48,7 +48,7 @@ struct Node<T> {
     /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
     /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
     /// static variables.)
-    miri_leak_tracking_next: core::cell::RefCell<*const Node<T>>,
+    miri_leak_tracking_next: core::cell::UnsafeCell<*const Node<T>>,
 }
 
 // Any particular `T` should never be accessed concurrently, so no need for `Sync`.
@@ -62,13 +62,13 @@ impl<T> Queue<T> {
             head: CachePadded::new(Atomic::null()),
             tail: CachePadded::new(Atomic::null()),
             #[cfg(miri)]
-            miri_leak_tracking_head: core::cell::RefCell::new(core::ptr::null()),
+            miri_leak_tracking_head: core::cell::UnsafeCell::new(core::ptr::null()),
         };
         let sentinel = Owned::new(Node {
             data: MaybeUninit::uninit(),
             next: Atomic::null(),
             #[cfg(miri)]
-            miri_leak_tracking_next: core::cell::RefCell::new(core::ptr::null()),
+            miri_leak_tracking_next: core::cell::UnsafeCell::new(core::ptr::null()),
         });
         unsafe {
             let guard = unprotected();
@@ -76,7 +76,7 @@ impl<T> Queue<T> {
             q.head.store(sentinel, Relaxed);
             #[cfg(miri)]
             {
-                q.miri_leak_tracking_head.replace(sentinel.deref());
+                std::ptr::write(q.miri_leak_tracking_head.get(), sentinel.deref());
             }
             q.tail.store(sentinel, Relaxed);
             q
@@ -112,7 +112,8 @@ impl<T> Queue<T> {
                     // in the raw pointer field, to assist in identifying memory leaks.
                     // Round trip Shared => reference => *const in order to force int-to-pointer
                     // conversion in Miri.
-                    o.miri_leak_tracking_next.replace(
+                    std::ptr::write(
+                        o.miri_leak_tracking_next.get(),
                         new.as_ref()
                             .map(|r| r as *const Node<T>)
                             .unwrap_or_else(core::ptr::null),
@@ -131,7 +132,7 @@ impl<T> Queue<T> {
             data: MaybeUninit::new(t),
             next: Atomic::null(),
             #[cfg(miri)]
-            miri_leak_tracking_next: core::cell::RefCell::new(core::ptr::null()),
+            miri_leak_tracking_next: core::cell::UnsafeCell::new(core::ptr::null()),
         });
         let new = Owned::into_shared(new, guard);
 
@@ -163,7 +164,7 @@ impl<T> Queue<T> {
                             // the raw pointer field, to assist in identifying memory leaks.
                             // Round trip Shared => reference => *const in order to force
                             // int-to-pointer conversion in Miri.
-                            self.miri_leak_tracking_head.replace(n);
+                            std::ptr::write(self.miri_leak_tracking_head.get(), n);
                         }
                         let tail = self.tail.load(Relaxed, guard);
                         // Advance the tail so that we don't retire a pointer to a reachable node.
@@ -202,7 +203,7 @@ impl<T> Queue<T> {
                             // the raw pointer field, to assist in identifying memory leaks.
                             // Round trip Shared => reference => *const in order to force
                             // int-to-pointer conversion in Miri.
-                            self.miri_leak_tracking_head.replace(n);
+                            std::ptr::write(self.miri_leak_tracking_head.get(), n);
                         }
                         let tail = self.tail.load(Relaxed, guard);
                         // Advance the tail so that we don't retire a pointer to a reachable node.
