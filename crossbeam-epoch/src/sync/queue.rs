@@ -110,14 +110,7 @@ impl<T> Queue<T> {
                 unsafe {
                     // Once the next pointer has been successfully updated, mirror the change
                     // in the raw pointer field, to assist in identifying memory leaks.
-                    // Round trip Shared => reference => *const in order to force int-to-pointer
-                    // conversion in Miri.
-                    std::ptr::write(
-                        o.miri_leak_tracking_next.get(),
-                        new.as_ref()
-                            .map(|r| r as *const Node<T>)
-                            .unwrap_or_else(core::ptr::null),
-                    );
+                    crate::sync::miri_leak_tracking_update_ptr(&o.next, &o.miri_leak_tracking_next);
                 }
                 // try to move the tail pointer forward
                 let _ = self.tail.compare_and_set(onto, new, Release, guard);
@@ -162,9 +155,7 @@ impl<T> Queue<T> {
                         {
                             // The head pointer was successfully updated, so mirror the change in
                             // the raw pointer field, to assist in identifying memory leaks.
-                            // Round trip Shared => reference => *const in order to force
-                            // int-to-pointer conversion in Miri.
-                            std::ptr::write(self.miri_leak_tracking_head.get(), n);
+                            crate::sync::miri_leak_tracking_update_ptr(&*self.head, &self.miri_leak_tracking_head);
                         }
                         let tail = self.tail.load(Relaxed, guard);
                         // Advance the tail so that we don't retire a pointer to a reachable node.
@@ -203,7 +194,7 @@ impl<T> Queue<T> {
                             // the raw pointer field, to assist in identifying memory leaks.
                             // Round trip Shared => reference => *const in order to force
                             // int-to-pointer conversion in Miri.
-                            std::ptr::write(self.miri_leak_tracking_head.get(), n);
+                            crate::sync::miri_leak_tracking_update_ptr(&*self.head, &self.miri_leak_tracking_head);
                         }
                         let tail = self.tail.load(Relaxed, guard);
                         // Advance the tail so that we don't retire a pointer to a reachable node.

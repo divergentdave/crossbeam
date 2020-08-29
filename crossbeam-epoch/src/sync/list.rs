@@ -130,11 +130,23 @@ pub struct Iter<'g, T, C: IsElement<T>> {
     /// Pointer from the predecessor to the current entry.
     pred: &'g Atomic<Entry>,
 
+    #[cfg(miri)]
+    /// A const pointer copy of the pointer from the predecessor to the current entry. This
+    /// additional field is present so that Miri's memory leak checker can follow the raw pointer.
+    /// (Since `Atomic` is a tagged pointer stored as an `AtomicUsize`, it has gone through Miri's
+    /// pointer-to-int conversion, and is not recognized when enumerating memory reachable from
+    /// static variables.)
+    miri_leak_tracking_pred: &'g core::cell::UnsafeCell<*const Entry>,
+
     /// The current entry.
     curr: Shared<'g, Entry>,
 
     /// The list head, needed for restarting iteration.
     head: &'g Atomic<Entry>,
+
+    #[cfg(miri)]
+    /// A const pointer copy of the head of the linked list, similar to `miri_leak_tracking_pred`.
+    miri_leak_tracking_head: &'g core::cell::UnsafeCell<*const Entry>,
 
     /// Logically, we store a borrow of an instance of `T` and
     /// use the type information from `C`.
@@ -211,14 +223,7 @@ impl<T, C: IsElement<T>> List<T, C> {
             #[cfg(miri)]
             {
                 // Mirror the change to the next pointer to assist in identifying memory leaks.
-                // Round trip Shared => reference => *const in order to force int-to-pointer
-                // conversion in Miri.
-                std::ptr::write(
-                    entry.miri_leak_tracking_next.get(),
-                    next.as_ref()
-                        .map(|r| r as *const Entry)
-                        .unwrap_or_else(core::ptr::null),
-                );
+                crate::sync::miri_leak_tracking_update_ptr(&entry.next, &entry.miri_leak_tracking_next);
             }
             match to.compare_and_set_weak(next, entry_ptr, Release, guard) {
                 Ok(_) => {
@@ -226,15 +231,7 @@ impl<T, C: IsElement<T>> List<T, C> {
                     {
                         // Once the head pointer has been successfully updated, mirror the change
                         // in the raw pointer field, to assist in identifying memory leaks.
-                        // Round trip Shared => reference => *const in order to force
-                        // int-to-pointer conversion in Miri.
-                        std::ptr::write(
-                            self.miri_leak_tracking_head.get(),
-                            entry_ptr
-                                .as_ref()
-                                .map(|r| r as *const Entry)
-                                .unwrap_or_else(core::ptr::null),
-                        );
+                        crate::sync::miri_leak_tracking_update_ptr(to, &self.miri_leak_tracking_head);
                     }
                     break;
                 }
@@ -261,8 +258,12 @@ impl<T, C: IsElement<T>> List<T, C> {
         Iter {
             guard,
             pred: &self.head,
+            #[cfg(miri)]
+            miri_leak_tracking_pred: &self.miri_leak_tracking_head,
             curr: self.head.load(Acquire, guard),
             head: &self.head,
+            #[cfg(miri)]
+            miri_leak_tracking_head: &self.miri_leak_tracking_head,
             _marker: PhantomData,
         }
     }
@@ -306,6 +307,16 @@ impl<'g, T: 'g, C: IsElement<T>> Iterator for Iter<'g, T, C> {
                     .compare_and_set(self.curr, succ, Acquire, self.guard)
                 {
                     Ok(_) => {
+                        #[cfg(miri)]
+                        unsafe {
+                            // If the next pointer was successfully updated,
+                            // mirror the change in the raw pointer field, to
+                            // assist in identifying memory leaks.
+                            crate::sync::miri_leak_tracking_update_ptr(
+                                self.pred,
+                                self.miri_leak_tracking_pred,
+                            );
+                        }
                         // We succeeded in unlinking `curr`, so we have to schedule
                         // deallocation. Deferred drop is okay, because `list.delete()` can only be
                         // called if `T: 'static`.
@@ -326,6 +337,10 @@ impl<'g, T: 'g, C: IsElement<T>> Iterator for Iter<'g, T, C> {
                 // `head`.
                 if succ.tag() != 0 {
                     self.pred = self.head;
+                    #[cfg(miri)]
+                    {
+                        self.miri_leak_tracking_pred = self.miri_leak_tracking_head;
+                    }
                     self.curr = self.head.load(Acquire, self.guard);
 
                     return Some(Err(IterError::Stalled));
@@ -338,6 +353,10 @@ impl<'g, T: 'g, C: IsElement<T>> Iterator for Iter<'g, T, C> {
 
             // Move one step forward.
             self.pred = &c.next;
+            #[cfg(miri)]
+            {
+                self.miri_leak_tracking_pred = &c.miri_leak_tracking_next;
+            }
             self.curr = succ;
 
             return Some(Ok(unsafe { C::element_of(c) }));
