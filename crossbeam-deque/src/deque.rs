@@ -75,9 +75,24 @@ impl<T> Buffer<T> {
     /// This method might be concurrently called with another `write` at the same index, which is
     /// technically speaking a data race and therefore UB. We should use an atomic load here, but
     /// that would be more expensive and difficult to implement generically for all types `T`.
-    /// Hence, as a hack, we use a volatile write instead.
+    /// Hence, as a hack, we use a volatile read instead.
     unsafe fn read(&self, index: isize) -> T {
         ptr::read_volatile(self.at(index))
+    }
+
+    /// Reads a task from the specified `index`, but returns it as `MaybeUninit<T>`.
+    ///
+    /// This method might be concurrently called with another `write` at the same index, which is
+    /// technically speaking a data race and therefore UB. We should use an atomic load here, but
+    /// that would be more expensive and difficult to implement generically for all types `T`.
+    /// Hence, as a hack, we use a volatile read instead.
+    ///
+    /// Reading a task as `MaybeUninit<T>` is useful in cases where the read is being done
+    /// speculatively, and the result may be discarded later if later synchronization operations
+    /// indicate another thread already took this task. Reading `T` directly on both threads could
+    /// cause undefined behavior if `T` is not `Copy`.
+    unsafe fn read_speculative(&self, index: isize) -> MaybeUninit<T> {
+        ptr::read_volatile(self.at(index) as *const MaybeUninit<T>)
     }
 }
 
@@ -632,7 +647,7 @@ impl<T> Stealer<T> {
 
         // Load the buffer and read the task at the front.
         let buffer = self.inner.buffer.load(Ordering::Acquire, guard);
-        let task = unsafe { buffer.deref().read(f) };
+        let task = unsafe { buffer.deref().read_speculative(f) };
 
         // Try incrementing the front index to steal the task.
         if self
@@ -647,7 +662,7 @@ impl<T> Stealer<T> {
         }
 
         // Return the stolen task.
-        Steal::Success(task)
+        unsafe { Steal::Success(task.assume_init()) }
     }
 
     /// Steals a batch of tasks and pushes them into another worker.
