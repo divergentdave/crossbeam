@@ -265,7 +265,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "deadlocks, body of child thread never runs")]
     fn port_gone_concurrent() {
         let (tx, rx) = channel::<i32>();
         let t = thread::spawn(move || {
@@ -276,7 +275,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "deadlocks, body of child thread never runs")]
     fn port_gone_concurrent_shared() {
         let (tx, rx) = channel::<i32>();
         let tx2 = tx.clone();
@@ -858,7 +856,6 @@ mod channel_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "deadlocks, neither for loop body ever runs")]
     fn test_recv_try_iter() {
         let (request_tx, request_rx) = channel();
         let (response_tx, response_rx) = channel();

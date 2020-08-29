@@ -407,7 +407,6 @@ fn both_ready() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, only the first thread ever runs")]
 fn loop_try() {
     const RUNS: usize = 20;
 

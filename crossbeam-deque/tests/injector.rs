@@ -221,7 +221,7 @@ fn stress() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, child threads never run")]
+#[cfg_attr(miri, ignore = "Miri's scheduler is too deterministic")]
 fn no_starvation() {
     const THREADS: usize = 8;
     #[cfg(not(miri))]

@@ -676,6 +676,7 @@ fn send_recv_same_channel() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
 fn channel_through_channel() {
     const COUNT: usize = 1000;
 

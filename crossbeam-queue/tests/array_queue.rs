@@ -58,7 +58,6 @@ fn len_empty_full() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, second thread never runs")]
 fn len() {
     #[cfg(not(miri))]
     const COUNT: usize = 25_000;
@@ -122,7 +121,6 @@ fn len() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, only the first thread runs")]
 fn spsc() {
     #[cfg(not(miri))]
     const COUNT: usize = 100_000;
@@ -154,7 +152,6 @@ fn spsc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, only the first thread runs")]
 fn mpmc() {
     #[cfg(not(miri))]
     const COUNT: usize = 25_000;
@@ -194,7 +191,6 @@ fn mpmc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, neither for loop body that pushes to the queue ever runs")]
 fn drops() {
     #[cfg(not(miri))]
     const RUNS: usize = 100;

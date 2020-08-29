@@ -329,9 +329,11 @@ fn stress_oneshot() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, neither for loop body ever runs")]
 fn stress_iter() {
+    #[cfg(not(miri))]
     const COUNT: usize = 1000;
+    #[cfg(miri)]
+    const COUNT: usize = 100;
 
     let (request_s, request_r) = bounded(0);
     let (response_s, response_r) = bounded(0);

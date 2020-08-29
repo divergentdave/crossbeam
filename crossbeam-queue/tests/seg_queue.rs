@@ -53,7 +53,6 @@ fn len() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, only one thread ever runs")]
 fn spsc() {
     #[cfg(not(miri))]
     const COUNT: usize = 100_000;
@@ -84,7 +83,6 @@ fn spsc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, only one thread runs")]
 fn mpmc() {
     #[cfg(not(miri))]
     const COUNT: usize = 25_000;
@@ -124,8 +122,16 @@ fn mpmc() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, neither for loop body that pushes to the queue ever runs")]
 fn drops() {
+    #[cfg(not(miri))]
+    const RUNS: usize = 100;
+    #[cfg(miri)]
+    const RUNS: usize = 10;
+    #[cfg(not(miri))]
+    const MAX_STEPS: usize = 10_000;
+    #[cfg(miri)]
+    const MAX_STEPS: usize = 100;
+
     static DROPS: AtomicUsize = AtomicUsize::new(0);
 
     #[derive(Debug, PartialEq)]
@@ -139,8 +145,8 @@ fn drops() {
 
     let mut rng = thread_rng();
 
-    for _ in 0..100 {
-        let steps = rng.gen_range(0, 10_000);
+    for _ in 0..RUNS {
+        let steps = rng.gen_range(0, MAX_STEPS);
         let additional = rng.gen_range(0, 1000);
 
         DROPS.store(0, Ordering::SeqCst);

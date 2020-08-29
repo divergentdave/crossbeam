@@ -101,6 +101,7 @@ fn spsc() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "UB: type validation failed: encountered a dangling box")]
 fn stampede() {
     const THREADS: usize = 8;
     #[cfg(not(miri))]
@@ -207,7 +208,7 @@ fn stress() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks, child threads never run")]
+#[cfg_attr(miri, ignore = "Miri's scheduler is too deterministic")]
 fn no_starvation() {
     const THREADS: usize = 8;
     #[cfg(not(miri))]
@@ -270,13 +271,12 @@ fn no_starvation() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "deadlocks")]
 fn destructors() {
     const THREADS: usize = 8;
     #[cfg(not(miri))]
     const COUNT: usize = 50_000;
     #[cfg(miri)]
-    const COUNT: usize = 50;
+    const COUNT: usize = 500;
     #[cfg(not(miri))]
     const STEPS: usize = 1000;
     #[cfg(miri)]
