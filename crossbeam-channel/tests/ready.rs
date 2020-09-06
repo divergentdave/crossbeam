@@ -676,7 +676,7 @@ fn send_recv_same_channel() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore = "UB: deallocating while item is protected")]
+#[cfg_attr(miri, ignore = "UB: deallocating while item is protected (see rust-lang/rust#55005)")]
 fn channel_through_channel() {
     const COUNT: usize = 1000;
 
