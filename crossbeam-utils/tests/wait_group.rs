@@ -37,6 +37,11 @@ fn wait() {
 
 #[test]
 fn wait_and_drop() {
+    #[cfg(not(miri))]
+    const DELAY_MS: u64 = 100;
+    #[cfg(miri)]
+    const DELAY_MS: u64 = 1000;
+
     let wg = WaitGroup::new();
     let (tx, rx) = mpsc::channel();
 
@@ -45,7 +50,7 @@ fn wait_and_drop() {
         let tx = tx.clone();
 
         thread::spawn(move || {
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(DELAY_MS));
             tx.send(()).unwrap();
             drop(wg);
         });
